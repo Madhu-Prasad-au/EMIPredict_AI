@@ -49,3 +49,4 @@ mlartifacts/
 
 data/emi_prediction_cleaned.csv
 models/best_regression_model.pkl
+models/best_regression_model_compressed.pkl
