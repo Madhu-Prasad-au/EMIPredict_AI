@@ -484,7 +484,11 @@ elif page == "Customer Segments":
         st.stop()
     left, right = st.columns([1, 1.2], gap="large")
     with left:
-        st.markdown('<div class="section-heading">Customer profile</div><div class="section-caption">Enter the customer's RFM behaviour</div>', unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-heading'>Customer profile</div>"
+            "<div class='section-caption'>Enter the customer's RFM behaviour</div>",
+            unsafe_allow_html=True
+        )
         with st.container(border=True):
             recency = st.number_input("Recency · days since last purchase", min_value=0, max_value=10000, value=30, step=1, help="Lower recency usually means a more recent purchase.")
             frequency = st.number_input("Frequency · number of purchases", min_value=1, max_value=100000, value=5, step=1)
