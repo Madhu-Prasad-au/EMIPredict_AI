@@ -1,8 +1,8 @@
-import html
-import os
 
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import html
+import traceback
 
 from utils.data_utils import load_data
 from utils.model_utils import (
@@ -12,9 +12,10 @@ from utils.model_utils import (
 )
 
 
-# -----------------------------------------------------------------------------
-# Page configuration
-# -----------------------------------------------------------------------------
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
+
 st.set_page_config(
     page_title="EMIPredict AI | Financial Intelligence",
     page_icon="💠",
@@ -23,325 +24,824 @@ st.set_page_config(
 )
 
 
-# -----------------------------------------------------------------------------
-# Visual system: Streamlit-native, deployment-friendly CSS
-# -----------------------------------------------------------------------------
+# ============================================================
+# CUSTOM DESIGN SYSTEM
+# ============================================================
+
 st.markdown(
     """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
     :root {
-      --ink: #eaf1ff;
-      --muted: #91a2bd;
-      --panel: #111d31;
-      --panel-2: #15243b;
-      --line: rgba(153, 177, 211, .16);
-      --mint: #5eead4;
-      --blue: #7c9cff;
+        --navy: #101a2c;
+        --navy-light: #192940;
+        --teal: #16b8a6;
+        --teal-light: #dff8f3;
+        --muted: #718096;
+        --border: #e5eaf1;
+        --surface: #ffffff;
     }
-    html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+
+    html, body, [class*="css"] {
+        font-family: 'DM Sans', sans-serif;
+    }
+
     .stApp {
-      background: radial-gradient(ellipse at 12% 0%, rgba(46, 82, 143, .20), transparent 38%),
-                  radial-gradient(ellipse at 100% 8%, rgba(31, 166, 153, .10), transparent 30%),
-                  #08111f;
-      color: var(--ink);
+        background: #f5f7fb;
     }
-    [data-testid="stHeader"] { background: rgba(8,17,31,.72); }
+
+    [data-testid="stHeader"] {
+        background: rgba(245, 247, 251, 0.92);
+    }
+
     [data-testid="stSidebar"] {
-      background: linear-gradient(180deg, #0d192b 0%, #0a1423 100%);
-      border-right: 1px solid var(--line);
+        background: #101a2c;
+        border-right: 1px solid #25334a;
     }
-    [data-testid="stSidebar"] > div { padding-top: 1.5rem; }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #aab8ce; }
-    [data-testid="stSidebarNav"] { padding-top: .5rem; }
-    .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1500px; }
-    h1, h2, h3 { font-family: 'Manrope', sans-serif !important; letter-spacing: -.035em; }
-    h1 { color: #f4f7ff; font-weight: 800 !important; }
-    h2, h3 { color: #e8efff; }
-    p, label, .stCaption { color: #a9b8cf; }
-    hr { border-color: var(--line); }
-    [data-testid="stMetric"] {
-      background: linear-gradient(145deg, rgba(21,36,59,.96), rgba(14,27,45,.96));
-      border: 1px solid var(--line); border-radius: 18px;
-      padding: 18px 20px; min-height: 120px;
-      box-shadow: 0 12px 30px rgba(0,0,0,.12);
+
+    [data-testid="stSidebar"] * {
+        color: #e9f0fa;
     }
-    [data-testid="stMetricLabel"] { color: #9eafc8 !important; font-size: .82rem; }
-    [data-testid="stMetricValue"] { color: #f2f6ff !important; font-family: 'Manrope', sans-serif; }
-    [data-testid="stMetricDelta"] { font-size: .78rem; }
-    [data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+
+    [data-testid="stSidebar"] hr {
+        border-color: #334157;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        line-height: 1.7;
+    }
+
+    h1, h2, h3 {
+        font-family: 'Manrope', sans-serif !important;
+        color: #15243b;
+        letter-spacing: -0.6px;
+    }
+
     .hero {
-      position: relative; overflow: hidden; border-radius: 26px;
-      padding: 34px 36px; margin: 0 0 25px 0;
-      background: linear-gradient(118deg, #142943 0%, #13233a 54%, #123c42 100%);
-      border: 1px solid rgba(134, 171, 214, .22);
-      box-shadow: 0 24px 65px rgba(0,0,0,.20);
+        position: relative;
+        overflow: hidden;
+        padding: 34px 36px;
+        border-radius: 22px;
+        background: linear-gradient(120deg, #101a2c 0%, #1b3450 72%, #145b63 100%);
+        color: white;
+        margin-bottom: 26px;
+        border: 1px solid rgba(255,255,255,0.08);
     }
-    .hero:after { content: ''; position: absolute; width: 340px; height: 340px; border-radius: 50%;
-      right: -95px; top: -190px; background: rgba(94,234,212,.10); border: 1px solid rgba(94,234,212,.12); }
-    .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .72rem; font-weight: 700; color: #73e7d4; margin-bottom: 12px; }
-    .hero-title { font-family: 'Manrope', sans-serif; font-size: clamp(1.8rem, 3vw, 2.65rem); line-height: 1.15; font-weight: 800; color: #f5f8ff; max-width: 760px; margin-bottom: 13px; }
-    .hero-copy { color: #b6c6dc; max-width: 710px; font-size: 1rem; line-height: 1.7; }
-    .hero-pill { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; padding: 8px 12px; border-radius: 999px;
-      border: 1px solid rgba(94,234,212,.28); background: rgba(94,234,212,.08); color: #aaf6e9; font-size: .78rem; font-weight: 600; }
-    .section-kicker { color: #6ee7d4; text-transform: uppercase; letter-spacing: .15em; font-size: .7rem; font-weight: 800; margin-bottom: 5px; }
-    .section-title { font-family: 'Manrope', sans-serif; color: #eff4ff; font-weight: 800; font-size: 1.35rem; letter-spacing: -.035em; margin-bottom: 4px; }
-    .section-copy { color: #93a5bf; font-size: .9rem; margin-bottom: 18px; }
-    .panel { height: 100%; background: linear-gradient(145deg, rgba(20,35,57,.95), rgba(13,25,42,.95));
-      border: 1px solid var(--line); border-radius: 20px; padding: 22px 23px; }
-    .panel-label { color: #94a8c5; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; margin-bottom: 13px; }
-    .model-name { font-family: 'Manrope', sans-serif; color: #f1f5ff; font-weight: 800; font-size: 1.15rem; line-height: 1.35; margin-bottom: 10px; overflow-wrap: anywhere; }
-    .model-desc { color: #a6b6cc; font-size: .88rem; line-height: 1.65; }
-    .tag { display: inline-block; border: 1px solid rgba(94,234,212,.23); color: #a1f1e4; background: rgba(94,234,212,.07); border-radius: 8px; padding: 5px 9px; font-size: .72rem; margin: 3px 4px 0 0; }
-    .step-card { background: rgba(18,32,52,.92); border: 1px solid var(--line); border-radius: 15px; padding: 17px 15px; min-height: 130px; }
-    .step-num { color: #65e5d1; font-size: .73rem; font-weight: 800; letter-spacing: .12em; margin-bottom: 11px; }
-    .step-title { color: #e9f0ff; font-weight: 700; font-size: .91rem; margin-bottom: 6px; }
-    .step-copy { color: #91a4bf; font-size: .78rem; line-height: 1.5; }
-    .footnote { color: #71839d; font-size: .78rem; }
-    .stButton > button { border-radius: 11px; border: 1px solid rgba(94,234,212,.35); background: #5eead4; color: #082126; font-weight: 800; }
-    .stButton > button:hover { background: #8bf3e3; border-color: #8bf3e3; color: #082126; }
-    div[data-baseweb="tab-list"] { gap: 8px; }
-    button[data-baseweb="tab"] { border-radius: 10px; padding: 10px 15px; }
-    @media (max-width: 800px) { .hero { padding: 25px 22px; } .panel { padding: 18px; } }
+
+    .hero::after {
+        content: "";
+        position: absolute;
+        width: 260px;
+        height: 260px;
+        right: -70px;
+        top: -120px;
+        border-radius: 50%;
+        border: 38px solid rgba(65, 221, 196, 0.10);
+    }
+
+    .hero-kicker {
+        color: #66e4d1;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+
+    .hero-title {
+        font-family: 'Manrope', sans-serif;
+        font-size: clamp(28px, 3.2vw, 43px);
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: -1.5px;
+        color: #ffffff;
+        margin-bottom: 12px;
+    }
+
+    .hero-copy {
+        color: #d0dbea;
+        font-size: 15px;
+        max-width: 690px;
+        line-height: 1.8;
+        margin-bottom: 20px;
+    }
+
+    .hero-tag {
+        display: inline-block;
+        padding: 7px 12px;
+        margin: 0 7px 5px 0;
+        border: 1px solid rgba(255,255,255,0.19);
+        border-radius: 20px;
+        color: #e5f5f4;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .section-label {
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: #73849a;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .section-heading {
+        font-family: 'Manrope', sans-serif;
+        color: #17263c;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.7px;
+        margin-bottom: 5px;
+    }
+
+    .section-copy {
+        color: #78869a;
+        font-size: 13px;
+        line-height: 1.7;
+        margin-bottom: 16px;
+    }
+
+    .metric-card {
+        background: #ffffff;
+        border: 1px solid #e5eaf1;
+        border-radius: 17px;
+        padding: 20px;
+        min-height: 135px;
+        box-shadow: 0 3px 14px rgba(23, 42, 69, 0.025);
+    }
+
+    .metric-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #7b899c;
+        margin-bottom: 13px;
+    }
+
+    .metric-value {
+        color: #15243b;
+        font-family: 'Manrope', sans-serif;
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .metric-note {
+        color: #8a97a8;
+        font-size: 11px;
+        margin-top: 9px;
+    }
+
+    .model-card {
+        background: #ffffff;
+        border: 1px solid #e5eaf1;
+        border-radius: 18px;
+        padding: 24px;
+        min-height: 215px;
+        box-shadow: 0 3px 14px rgba(23, 42, 69, 0.025);
+    }
+
+    .model-icon {
+        display: inline-block;
+        background: #e1f8f3;
+        color: #078f81;
+        border-radius: 11px;
+        padding: 11px;
+        font-size: 21px;
+        margin-bottom: 14px;
+    }
+
+    .model-name {
+        font-family: 'Manrope', sans-serif;
+        font-size: 19px;
+        font-weight: 800;
+        color: #17263c;
+        margin-bottom: 8px;
+        overflow-wrap: anywhere;
+    }
+
+    .model-description {
+        color: #748399;
+        font-size: 13px;
+        line-height: 1.8;
+    }
+
+    .status-pill {
+        display: inline-block;
+        background: #e1f8ee;
+        color: #16825a;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.7px;
+        margin-bottom: 15px;
+    }
+
+    .pipeline-card {
+        background: white;
+        border: 1px solid #e5eaf1;
+        border-radius: 15px;
+        padding: 18px;
+        min-height: 145px;
+        margin-bottom: 8px;
+    }
+
+    .pipeline-number {
+        font-size: 11px;
+        color: #0a9c8d;
+        font-weight: 800;
+        letter-spacing: 1px;
+        margin-bottom: 13px;
+    }
+
+    .pipeline-title {
+        font-family: 'Manrope', sans-serif;
+        font-size: 14px;
+        color: #1a2a41;
+        font-weight: 800;
+        margin-bottom: 7px;
+    }
+
+    .pipeline-copy {
+        font-size: 12px;
+        color: #7c899a;
+        line-height: 1.7;
+    }
+
+    .footer {
+        color: #8995a5;
+        font-size: 11px;
+        text-align: center;
+        padding: 22px 0 12px 0;
+    }
+
+    div[data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #e5eaf1;
+        border-radius: 15px;
+        padding: 16px;
+    }
+
+    div[data-testid="stMetricLabel"] {
+        color: #78869a;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #15243b;
+    }
+
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #e5eaf1;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .stButton button {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+        .hero {
+            padding: 25px 22px;
+        }
+        .metric-card {
+            padding: 15px;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-# -----------------------------------------------------------------------------
-# Load application assets
-# -----------------------------------------------------------------------------
-@st.cache_resource
-def get_models():
-    classification_model = load_classification_model()
-    regression_model = load_regression_model()
-    feature_info = load_feature_info()
-    return classification_model, regression_model, feature_info
+# ============================================================
+# SIDEBAR
+# ============================================================
 
-
-@st.cache_data
-def get_data():
-    return load_data()
-
-
-try:
-    classification_model, regression_model, feature_info = get_models()
-    df = get_data()
-    if df is None or df.empty:
-        st.error("The financial dataset loaded successfully, but it contains no records.")
-        st.stop()
-except Exception as exc:
-    st.error(f"Unable to load project files: {exc}")
-    st.info("Check that the dataset, saved models, and files inside the `utils` folder are included in the deployment.")
-    st.stop()
-
-
-# -----------------------------------------------------------------------------
-# Small helpers
-# -----------------------------------------------------------------------------
-def safe_text(value, fallback="Not available"):
-    if value is None:
-        return fallback
-    text = str(value).strip()
-    return text if text and text.lower() != "nan" else fallback
-
-
-def section_header(kicker, title, copy):
-    st.markdown(
-        f'<div class="section-kicker">{html.escape(kicker)}</div>'
-        f'<div class="section-title">{html.escape(title)}</div>'
-        f'<div class="section-copy">{html.escape(copy)}</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def panel_open(label):
-    st.markdown(f'<div class="panel"><div class="panel-label">{html.escape(label)}</div>', unsafe_allow_html=True)
-
-
-def panel_close():
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# -----------------------------------------------------------------------------
-# Sidebar
-# -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown(
         """
-        <div style="display:flex;align-items:center;gap:12px;margin:0 0 8px 0;">
-          <div style="width:43px;height:43px;border-radius:14px;background:linear-gradient(135deg,#5eead4,#7c9cff);display:flex;align-items:center;justify-content:center;color:#071827;font-size:22px;font-weight:900;">E</div>
-          <div><div style="font-family:Manrope,sans-serif;color:#f1f5ff;font-size:1.05rem;font-weight:800;">EMIPredict <span style="color:#5eead4;">AI</span></div>
-          <div style="font-size:.68rem;color:#8499b6;letter-spacing:.1em;text-transform:uppercase;">Financial intelligence</div></div>
+        <div style="padding: 12px 0 20px 0;">
+            <div style="font-size: 12px; color: #5ee6d0;
+                        font-weight: 800; letter-spacing: 2px;">
+                EMIPREDICT
+            </div>
+            <div style="font-family: Manrope, sans-serif;
+                        font-size: 25px; font-weight: 800;
+                        color: white; margin-top: 4px;">
+                AI Platform<span style="color:#42d7c0;">.</span>
+            </div>
+            <div style="font-size: 11px; color: #9eafc5;
+                        margin-top: 8px;">
+                FINANCIAL INTELLIGENCE
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown("---")
-    st.markdown("**YOUR WORKSPACE**")
-    st.caption("Use the page navigation to move between prediction, analytics, model comparison, and record management.")
-    st.markdown("---")
-    st.markdown("**PLATFORM MODULES**")
-    st.markdown("🔮  EMI eligibility & prediction")
-    st.markdown("📊  Financial data explorer")
-    st.markdown("🧠  Model performance")
-    st.markdown("🗂️  Financial record management")
-    st.markdown("---")
-    st.markdown("<span style='color:#5eead4;font-weight:700;'>●</span> <span style='color:#9eafc8;'>Dashboard initialized</span>", unsafe_allow_html=True)
+
+    st.divider()
+
+    st.markdown("### Navigation")
+    st.caption(
+        "Use the pages in the Streamlit navigation menu "
+        "to access prediction, analytics, and data management."
+    )
+
+    st.markdown(
+        """
+        <div style="background:#192940; padding:15px;
+                    border-radius:12px; margin-top:20px;">
+            <div style="color:#5ee6d0; font-size:11px;
+                        font-weight:800; letter-spacing:1px;">
+                PLATFORM MODULES
+            </div>
+            <div style="font-size:12px; line-height:2.2;
+                        margin-top:8px;">
+                ◈ EMI Eligibility Prediction<br>
+                ◈ EMI Amount Estimation<br>
+                ◈ Financial Data Analytics<br>
+                ◈ Model Experiment Tracking<br>
+                ◈ Financial Record Management
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
     st.caption("FinTech • Machine Learning • Decision Support")
 
 
-# -----------------------------------------------------------------------------
-# Hero
-# -----------------------------------------------------------------------------
-st.markdown(
-    """
-    <div class="hero">
-      <div class="eyebrow">FINANCIAL DECISION INTELLIGENCE</div>
-      <div class="hero-title">Make smarter EMI decisions with machine learning.</div>
-      <div class="hero-copy">A unified workspace for assessing EMI eligibility, estimating a customer's affordable monthly commitment, and exploring the data behind your predictions.</div>
-      <div class="hero-pill"><span>✦</span> Classification + Regression <span style="opacity:.5;">|</span> Data-led assessment</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+# ============================================================
+# ERROR REPORTING
+# ============================================================
 
-# Metrics are based on the loaded dataset; use fallbacks for optional columns.
-record_count = len(df)
-feature_count = int(df.shape[1])
-scenario_count = int(df["emi_scenario"].nunique()) if "emi_scenario" in df.columns else None
-class_count = int(df["emi_eligibility"].nunique()) if "emi_eligibility" in df.columns else None
+def show_error(title, exc):
+    """Display a readable error and its Python traceback."""
+    st.error(title)
+    st.code(f"{type(exc).__name__}: {exc}", language="text")
 
-section_header("OVERVIEW", "Your portfolio at a glance", "A live snapshot of the dataset currently connected to EMIPredict AI.")
-metric_cols = st.columns(4, gap="medium")
-with metric_cols[0]:
-    st.metric("Customer records", f"{record_count:,}")
-with metric_cols[1]:
-    st.metric("Dataset columns", f"{feature_count:,}")
-with metric_cols[2]:
-    st.metric("EMI scenarios", f"{scenario_count:,}" if scenario_count is not None else "—")
-with metric_cols[3]:
-    st.metric("Eligibility classes", f"{class_count:,}" if class_count is not None else "—")
+    with st.expander("View full technical traceback"):
+        st.code(traceback.format_exc(), language="text")
 
-st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+    st.info(
+        "Copy the exception type, message, and traceback when "
+        "troubleshooting this problem. Avoid sharing credentials "
+        "or private customer data."
+    )
 
-# Model cards
-section_header("MODEL INTELLIGENCE", "Two models. One decision workflow.", "Classification estimates eligibility, while regression estimates an affordable monthly EMI amount.")
-model_left, model_right = st.columns(2, gap="large")
-classes = feature_info.get("classification_classes", []) if isinstance(feature_info, dict) else []
-if isinstance(classes, (str, int, float)):
-    classes = [classes]
-classes_html = "".join(f'<span class="tag">{html.escape(str(item))}</span>' for item in classes) or '<span class="tag">Classes not listed</span>'
-classification_name = safe_text(feature_info.get("best_classification_model") if isinstance(feature_info, dict) else None)
-regression_name = safe_text(feature_info.get("best_regression_model") if isinstance(feature_info, dict) else None)
-with model_left:
+
+# ============================================================
+# LOAD MODELS AND DATA
+# ============================================================
+
+try:
+    with st.spinner("Loading financial intelligence platform..."):
+        classification_model = load_classification_model()
+        regression_model = load_regression_model()
+        feature_info = load_feature_info()
+        df = load_data()
+
+    if df is None:
+        raise ValueError("load_data() returned None.")
+
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame(df)
+
+    if df.empty:
+        st.warning("The dataset loaded successfully but contains no records.")
+
+except Exception as exc:
+    st.title("EMIPredict AI")
+    st.error("The application could not load its required data or models.")
+    show_error("Startup failure details", exc)
+    st.stop()
+
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def safe_unique_count(data, column):
+    if column in data.columns:
+        return int(data[column].nunique(dropna=True))
+    return None
+
+
+def format_number(value):
+    if value is None:
+        return "—"
+    return f"{value:,}"
+
+
+def metric_card(label, value, note):
     st.markdown(
         f"""
-        <div class="panel">
-          <div class="panel-label">01 / Classification engine</div>
-          <div style="font-size:1.7rem;margin-bottom:12px;">◈</div>
-          <div class="model-name">{html.escape(classification_name)}</div>
-          <div class="model-desc">Evaluates the customer's profile and predicts the EMI eligibility category.</div>
-          <div style="margin-top:17px;color:#91a5c1;font-size:.76rem;font-weight:700;">ELIGIBILITY LABELS</div>
-          <div style="margin-top:6px;">{classes_html}</div>
+        <div class="metric-card">
+            <div class="metric-label">{html.escape(str(label))}</div>
+            <div class="metric-value">{html.escape(str(value))}</div>
+            <div class="metric-note">{html.escape(str(note))}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-with model_right:
+
+
+# ============================================================
+# MAIN DASHBOARD
+# ============================================================
+
+try:
+    # Hero section
     st.markdown(
-        f"""
-        <div class="panel">
-          <div class="panel-label">02 / Regression engine</div>
-          <div style="font-size:1.7rem;margin-bottom:12px;">⌁</div>
-          <div class="model-name">{html.escape(regression_name)}</div>
-          <div class="model-desc">Estimates a maximum affordable monthly EMI amount to support more informed customer-level decisions.</div>
-          <div style="margin-top:17px;color:#91a5c1;font-size:.76rem;font-weight:700;">MODEL OUTPUT</div>
-          <div style="margin-top:6px;"><span class="tag">Estimated monthly EMI</span><span class="tag">Numeric prediction</span></div>
+        """
+        <div class="hero">
+            <div class="hero-kicker">FINANCIAL INTELLIGENCE PLATFORM</div>
+            <div class="hero-title">
+                Smarter EMI decisions.<br>
+                Better financial insights.
+            </div>
+            <div class="hero-copy">
+                An integrated machine learning platform for assessing
+                EMI eligibility, estimating affordable monthly payments,
+                and exploring financial data through predictive analytics.
+            </div>
+            <span class="hero-tag">Machine Learning</span>
+            <span class="hero-tag">Eligibility Classification</span>
+            <span class="hero-tag">EMI Regression</span>
+            <span class="hero-tag">Financial Analytics</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-st.markdown("<div style='height:25px'></div>", unsafe_allow_html=True)
+    # Overview
+    st.markdown(
+        """
+        <div class="section-label">OVERVIEW</div>
+        <div class="section-heading">Your financial intelligence overview</div>
+        <div class="section-copy">
+            A snapshot of the dataset powering the current application.
+            These are dataset statistics, not live banking metrics.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-# Dataset analysis area
-section_header("DATA EXPLORER", "Understand the data behind the models", "Review sample records and inspect the available fields before running customer-level predictions.")
-tab_preview, tab_profile, tab_distribution = st.tabs(["▤  Records", "◫  Data profile", "▥  Eligibility distribution"])
-with tab_preview:
-    top_controls = st.columns([1, 1, 2])
-    with top_controls[0]:
-        preview_rows = st.selectbox("Rows to display", [10, 25, 50, 100], index=0)
-    with top_controls[1]:
-        show_all_columns = st.toggle("All columns", value=False)
-    with top_controls[2]:
-        search_text = st.text_input("Filter records", placeholder="Search visible values…", label_visibility="collapsed")
-    preview_df = df.copy()
-    if search_text.strip():
-        search_mask = preview_df.astype(str).apply(lambda col: col.str.contains(search_text.strip(), case=False, na=False)).any(axis=1)
-        preview_df = preview_df.loc[search_mask]
-    if not show_all_columns:
-        preview_df = preview_df.iloc[:, : min(8, len(preview_df.columns))]
-    st.dataframe(preview_df.head(preview_rows), use_container_width=True, hide_index=True)
-    st.caption(f"Showing {min(preview_rows, len(preview_df)):,} of {len(preview_df):,} matching records. Use the other tabs to inspect dataset quality and class balance.")
-with tab_profile:
-    profile_a, profile_b = st.columns(2, gap="large")
-    with profile_a:
-        st.markdown("**Dataset dimensions**")
-        profile_df = pd.DataFrame({"Measure": ["Rows", "Columns", "Duplicate rows", "Missing values"], "Value": [len(df), len(df.columns), int(df.duplicated().sum()), int(df.isna().sum().sum())]})
-        st.dataframe(profile_df, use_container_width=True, hide_index=True)
-    with profile_b:
-        st.markdown("**Column completeness**")
-        missing = df.isna().sum().rename("Missing values").to_frame()
-        missing["Completeness %"] = ((len(df) - missing["Missing values"]) / max(len(df), 1) * 100).round(1)
-        missing = missing.sort_values("Completeness %")
-        st.dataframe(missing, use_container_width=True)
-with tab_distribution:
-    if "emi_eligibility" in df.columns:
-        counts = df["emi_eligibility"].fillna("Missing").astype(str).value_counts().rename_axis("Eligibility class").reset_index(name="Records")
-        chart_col, table_col = st.columns([1.4, 1], gap="large")
-        with chart_col:
-            st.markdown("**Records by eligibility class**")
-            st.bar_chart(counts.set_index("Eligibility class"), use_container_width=True)
-        with table_col:
-            st.markdown("**Class breakdown**")
-            counts["Share"] = (counts["Records"] / max(len(df), 1) * 100).round(1).astype(str) + "%"
-            st.dataframe(counts, use_container_width=True, hide_index=True)
+    total_records = len(df)
+    total_columns = len(df.columns)
+    scenario_count = safe_unique_count(df, "emi_scenario")
+    eligibility_count = safe_unique_count(df, "emi_eligibility")
+    missing_cells = int(df.isna().sum().sum())
+    duplicate_rows = int(df.duplicated().sum())
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        metric_card(
+            "TOTAL RECORDS",
+            format_number(total_records),
+            "Rows in the loaded dataset",
+        )
+
+    with c2:
+        metric_card(
+            "DATASET FEATURES",
+            format_number(total_columns),
+            "Columns available for analysis",
+        )
+
+    with c3:
+        metric_card(
+            "EMI SCENARIOS",
+            format_number(scenario_count),
+            "Unique values, when available",
+        )
+
+    with c4:
+        metric_card(
+            "ELIGIBILITY CLASSES",
+            format_number(eligibility_count),
+            "Unique labels, when available",
+        )
+
+    st.write("")
+
+    # Data health
+    st.markdown(
+        """
+        <div class="section-label">DATA QUALITY</div>
+        <div class="section-heading">Dataset health check</div>
+        <div class="section-copy">
+            Basic quality indicators calculated directly from the loaded dataset.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    q1, q2, q3 = st.columns(3)
+
+    with q1:
+        st.metric("Missing cells", f"{missing_cells:,}")
+
+    with q2:
+        st.metric("Duplicate rows", f"{duplicate_rows:,}")
+
+    with q3:
+        completeness = (
+            100 * (1 - missing_cells / (total_records * total_columns))
+            if total_records > 0 and total_columns > 0
+            else 0
+        )
+        st.metric("Cell completeness", f"{completeness:.1f}%")
+
+    st.divider()
+
+    # Model cards
+    st.markdown(
+        """
+        <div class="section-label">PREDICTIVE ENGINE</div>
+        <div class="section-heading">Machine learning models</div>
+        <div class="section-copy">
+            The model names below come from your existing model metadata.
+            Successful loading does not by itself guarantee prediction accuracy.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    classification_name = feature_info.get(
+        "best_classification_model", "Classification model"
+    )
+    regression_name = feature_info.get(
+        "best_regression_model", "Regression model"
+    )
+
+    classification_classes = feature_info.get(
+        "classification_classes", []
+    )
+
+    if isinstance(classification_classes, (list, tuple)):
+        classes_text = ", ".join(map(str, classification_classes))
     else:
-        st.info("The current dataset does not contain an `emi_eligibility` column, so a class distribution cannot be shown.")
+        classes_text = str(classification_classes)
 
-st.markdown("<div style='height:25px'></div>", unsafe_allow_html=True)
+    mc1, mc2 = st.columns(2)
 
-# Visual pipeline
-section_header("HOW IT WORKS", "From customer data to an informed estimate", "A high-level view of the workflow implemented across the application.")
-steps = [
-    ("01", "Customer data", "Load and prepare the financial dataset."),
-    ("02", "Data preparation", "Clean fields and engineer useful inputs."),
-    ("03", "Model inference", "Run eligibility classification and EMI regression."),
-    ("04", "Model tracking", "Use MLflow experiments to compare candidates."),
-    ("05", "Best model", "Select the saved model configured for the app."),
-    ("06", "Prediction", "Present estimates to support a review."),
-]
-step_cols = st.columns(3, gap="medium")
-for idx, (number, title, description) in enumerate(steps):
-    with step_cols[idx % 3]:
+    with mc1:
         st.markdown(
             f"""
-            <div class="step-card" style="margin-bottom:14px;">
-              <div class="step-num">STEP {number}</div>
-              <div class="step-title">{html.escape(title)}</div>
-              <div class="step-copy">{html.escape(description)}</div>
+            <div class="model-card">
+                <div class="model-icon">◈</div><br>
+                <span class="status-pill">LOADED</span>
+                <div class="model-name">
+                    {html.escape(str(classification_name))}
+                </div>
+                <div class="model-description">
+                    <b>Classification engine</b><br>
+                    Estimates the EMI eligibility category using the
+                    features expected by your trained classification model.
+                    <br><br>
+                    <b>Configured classes:</b>
+                    {html.escape(classes_text or "Not specified in metadata")}
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-# Footer
-st.markdown("<div style='height:15px'></div><hr>", unsafe_allow_html=True)
-footer_left, footer_right = st.columns([2, 1])
-with footer_left:
-    st.markdown("<div style='color:#a7b7ce;font-weight:700;'>EMIPredict <span style='color:#5eead4;'>AI</span></div><div class='footnote'>Financial Risk Assessment Platform · Machine Learning Decision Support</div>", unsafe_allow_html=True)
-with footer_right:
-    st.markdown("<div class='footnote' style='text-align:right;padding-top:5px;'>Predictions are estimates and should be reviewed alongside applicable lending policies.</div>", unsafe_allow_html=True)
+    with mc2:
+        st.markdown(
+            f"""
+            <div class="model-card">
+                <div class="model-icon">⌁</div><br>
+                <span class="status-pill">LOADED</span>
+                <div class="model-name">
+                    {html.escape(str(regression_name))}
+                </div>
+                <div class="model-description">
+                    <b>Regression engine</b><br>
+                    Estimates a numerical monthly EMI amount from the
+                    features expected by your trained regression model.
+                    <br><br>
+                    <b>Output:</b> Estimated maximum affordable monthly EMI,
+                    subject to your model's training and target definition.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+
+    st.info(
+        "Use the dedicated prediction pages to generate predictions. "
+        "This homepage does not independently validate loan eligibility "
+        "or guarantee that a customer can afford a particular EMI."
+    )
+
+    st.divider()
+
+    # Dataset explorer
+    st.markdown(
+        """
+        <div class="section-label">DATA EXPLORER</div>
+        <div class="section-heading">Explore the financial dataset</div>
+        <div class="section-copy">
+            Search records and inspect the data available to the platform.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    search_term = st.text_input(
+        "Search records",
+        placeholder="Enter a name, category, scenario, or value...",
+        key="homepage_dataset_search",
+    )
+
+    row_limit = st.selectbox(
+        "Rows to display",
+        options=[10, 25, 50, 100],
+        index=1,
+        key="homepage_dataset_row_limit",
+    )
+
+    filtered_df = df
+
+    if search_term.strip():
+        try:
+            search_mask = (
+                df.astype(str)
+                .apply(
+                    lambda col: col.str.contains(
+                        search_term.strip(),
+                        case=False,
+                        regex=False,
+                        na=False,
+                    )
+                )
+                .any(axis=1)
+            )
+            filtered_df = df.loc[search_mask]
+        except Exception as exc:
+            st.warning(f"Dataset search could not be completed: {exc}")
+
+    st.caption(
+        f"Showing {min(len(filtered_df), row_limit):,} of "
+        f"{len(filtered_df):,} matching records."
+    )
+
+    st.dataframe(
+        filtered_df.head(row_limit),
+        width="stretch",
+        hide_index=True,
+    )
+
+    with st.expander("View column information"):
+        column_info = pd.DataFrame(
+            {
+                "Column": df.columns.astype(str),
+                "Data type": df.dtypes.astype(str).values,
+                "Missing values": df.isna().sum().values,
+                "Unique values": df.nunique(dropna=True).values,
+            }
+        )
+
+        st.dataframe(
+            column_info,
+            width="stretch",
+            hide_index=True,
+        )
+
+    # Eligibility distribution
+    if "emi_eligibility" in df.columns:
+        st.write("")
+        st.markdown(
+            """
+            <div class="section-label">ELIGIBILITY DISTRIBUTION</div>
+            <div class="section-heading">Labels in the dataset</div>
+            <div class="section-copy">
+                This chart describes the loaded dataset's labels. It is
+                not a prediction result or a measure of model accuracy.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        eligibility_counts = (
+            df["emi_eligibility"]
+            .fillna("Missing")
+            .astype(str)
+            .value_counts()
+        )
+
+        if not eligibility_counts.empty:
+            chart_df = eligibility_counts.rename_axis(
+                "Eligibility category"
+            ).reset_index(name="Record count")
+
+            st.bar_chart(
+                chart_df.set_index("Eligibility category"),
+                width="stretch",
+            )
+
+    st.divider()
+
+    # Project workflow
+    st.markdown(
+        """
+        <div class="section-label">HOW IT WORKS</div>
+        <div class="section-heading">The machine learning workflow</div>
+        <div class="section-copy">
+            A high-level representation of the project's intended workflow.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    stages = [
+        (
+            "01",
+            "Data ingestion",
+            "Load the financial dataset and supporting project assets.",
+        ),
+        (
+            "02",
+            "Data preparation",
+            "Clean records and prepare the features used by the models.",
+        ),
+        (
+            "03",
+            "Feature engineering",
+            "Prepare input variables in the format expected by each model.",
+        ),
+        (
+            "04",
+            "Model inference",
+            "Use classification and regression for their respective tasks.",
+        ),
+        (
+            "05",
+            "Model tracking",
+            "Track experiments and model information through the project's MLflow setup.",
+        ),
+        (
+            "06",
+            "Prediction interface",
+            "Present predictions through the application's dedicated pages.",
+        ),
+    ]
+
+    for start in range(0, len(stages), 3):
+        stage_cols = st.columns(3)
+
+        for col, stage in zip(stage_cols, stages[start:start + 3]):
+            number, title, description = stage
+
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="pipeline-card">
+                        <div class="pipeline-number">STAGE {number}</div>
+                        <div class="pipeline-title">
+                            {html.escape(title)}
+                        </div>
+                        <div class="pipeline-copy">
+                            {html.escape(description)}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    st.write("")
+    st.markdown(
+        """
+        <div class="footer">
+            EMIPredict AI · Financial Risk Assessment & Decision Support<br>
+            Machine learning outputs are estimates and should be reviewed
+            alongside appropriate financial checks.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+except Exception as exc:
+    # This catches ordinary exceptions raised while rendering the dashboard.
+    st.error("An unexpected error occurred while rendering the dashboard.")
+    st.code(f"{type(exc).__name__}: {exc}", language="text")
+
+    with st.expander("Full Python traceback", expanded=True):
+        st.code(traceback.format_exc(), language="text")
+
+    st.warning(
+        "Copy the exception and traceback above. They should help identify "
+        "the failing operation. This diagnostic block cannot catch every "
+        "process-level failure."
+    )
