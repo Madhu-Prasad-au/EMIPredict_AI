@@ -1,45 +1,35 @@
 
 # ============================================================
-# EMIPredict AI | Intelligent Financial Risk Assessment Platform
-# Premium Streamlit Dashboard
+# EMIPredict AI | Premium Financial Intelligence Dashboard
+# Streamlit homepage | Hugging Face fallback | Safe initialization
 # ============================================================
 
 from pathlib import Path
 import html
-import os
+import traceback
 import warnings
 
 import pandas as pd
 import streamlit as st
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-
-# Optional visualization library
 try:
     import plotly.express as px
-    import plotly.graph_objects as go
     PLOTLY_AVAILABLE = True
 except ImportError:
     PLOTLY_AVAILABLE = False
 
 
-# ------------------------------------------------------------
+# ============================================================
 # 1. CONFIGURATION
-# ------------------------------------------------------------
+# ============================================================
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 
 HF_REPO_ID = "M-Prasad/EMIPredict_AI"
-HF_DATASET_URL = (
-    "https://huggingface.co/datasets/"
-    f"{HF_REPO_ID}/resolve/main/emi_prediction_cleaned.csv"
-    "?download=true"
-)
 
-# Also try the model repository URL in case the dataset is hosted
-# as a regular file in the same Hugging Face repository.
-HF_MODEL_REPO_DATA_URL = (
+# Dataset fallback. Update this if your CSV is in another HF repository.
+HF_DATASET_URL = (
     f"https://huggingface.co/{HF_REPO_ID}/resolve/main/"
     "emi_prediction_cleaned.csv?download=true"
 )
@@ -57,22 +47,19 @@ st.set_page_config(
 )
 
 
-# ------------------------------------------------------------
-# 2. PREMIUM DESIGN SYSTEM
-# ------------------------------------------------------------
+# ============================================================
+# 2. VISUAL DESIGN SYSTEM
+# ============================================================
 
 st.markdown(
     """
     <style>
-    @import url(
-      'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap'
-    );
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
     :root {
         --bg: #080d19;
         --panel: #10192a;
-        --panel-2: #121f33;
-        --border: rgba(148, 163, 184, 0.15);
+        --border: rgba(148,163,184,.15);
         --text: #edf3ff;
         --muted: #94a3b8;
         --cyan: #5ee7f5;
@@ -86,16 +73,16 @@ st.markdown(
 
     .stApp {
         background:
-            radial-gradient(ellipse at 12% 0%,
-                rgba(45, 91, 170, 0.17), transparent 36%),
-            radial-gradient(ellipse at 100% 12%,
-                rgba(20, 184, 166, 0.09), transparent 30%),
-            var(--bg);
+          radial-gradient(ellipse at 12% 0%,
+            rgba(45,91,170,.18), transparent 36%),
+          radial-gradient(ellipse at 100% 12%,
+            rgba(20,184,166,.09), transparent 30%),
+          var(--bg);
         color: var(--text);
     }
 
     [data-testid="stHeader"] {
-        background: rgba(8, 13, 25, 0.78);
+        background: rgba(8,13,25,.8);
     }
 
     [data-testid="stSidebar"] {
@@ -113,14 +100,14 @@ st.markdown(
 
     .block-container {
         max-width: 1550px;
-        padding-top: 1.6rem;
+        padding-top: 1.5rem;
         padding-bottom: 3rem;
     }
 
     h1, h2, h3, h4 {
         font-family: 'Space Grotesk', sans-serif !important;
-        letter-spacing: -0.5px;
         color: var(--text);
+        letter-spacing: -.5px;
     }
 
     p, li, label {
@@ -129,9 +116,9 @@ st.markdown(
 
     .brand {
         font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.4rem;
         font-weight: 700;
-        font-size: 1.35rem;
-        letter-spacing: -0.7px;
+        letter-spacing: -.8px;
     }
 
     .brand-accent {
@@ -140,54 +127,49 @@ st.markdown(
 
     .sidebar-tag {
         display: inline-block;
-        font-size: 0.68rem;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        color: var(--cyan);
-        border: 1px solid rgba(94, 231, 245, 0.24);
-        background: rgba(94, 231, 245, 0.07);
-        border-radius: 20px;
+        margin-top: 9px;
         padding: 5px 10px;
-        margin-top: 8px;
+        border-radius: 20px;
+        border: 1px solid rgba(94,231,245,.24);
+        background: rgba(94,231,245,.07);
+        color: var(--cyan);
+        font-size: .68rem;
+        letter-spacing: 1.4px;
     }
 
     .hero {
         position: relative;
         overflow: hidden;
-        border: 1px solid rgba(117, 157, 255, 0.25);
+        border: 1px solid rgba(117,157,255,.25);
         border-radius: 25px;
-        padding: 35px 36px;
-        background:
-            radial-gradient(circle at 86% 12%,
-                rgba(94, 231, 245, 0.18), transparent 28%),
-            radial-gradient(circle at 70% 110%,
-                rgba(114, 153, 255, 0.22), transparent 38%),
-            linear-gradient(125deg, #101a2d 0%, #111d35 54%, #102b39 100%);
-        box-shadow: 0 18px 55px rgba(0, 0, 0, 0.18);
+        padding: 36px;
         margin-bottom: 22px;
+        background:
+          radial-gradient(circle at 86% 12%,
+            rgba(94,231,245,.18), transparent 28%),
+          radial-gradient(circle at 70% 110%,
+            rgba(114,153,255,.22), transparent 38%),
+          linear-gradient(125deg,#101a2d 0%,#111d35 54%,#102b39 100%);
+        box-shadow: 0 18px 55px rgba(0,0,0,.18);
     }
 
     .hero-eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
         color: var(--cyan);
         text-transform: uppercase;
-        font-size: 0.72rem;
+        font-size: .72rem;
         font-weight: 700;
         letter-spacing: 1.8px;
-        margin-bottom: 15px;
+        margin-bottom: 16px;
     }
 
     .hero-title {
         font-family: 'Space Grotesk', sans-serif;
-        font-size: clamp(2rem, 4vw, 3.3rem);
+        font-size: clamp(2rem,4vw,3.35rem);
         line-height: 1.08;
         letter-spacing: -1.7px;
         font-weight: 700;
-        max-width: 780px;
         color: #f3f7ff;
-        margin: 0 0 16px 0;
+        margin-bottom: 17px;
     }
 
     .hero-title span {
@@ -196,9 +178,9 @@ st.markdown(
 
     .hero-description {
         color: #b4c3d9;
-        font-size: 0.98rem;
+        font-size: .98rem;
         line-height: 1.8;
-        max-width: 710px;
+        max-width: 750px;
         margin-bottom: 23px;
     }
 
@@ -211,35 +193,34 @@ st.markdown(
     .hero-pill {
         padding: 8px 12px;
         border-radius: 9px;
-        background: rgba(255, 255, 255, 0.055);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255,255,255,.055);
+        border: 1px solid rgba(255,255,255,.1);
         color: #dce8fa;
-        font-size: 0.78rem;
+        font-size: .78rem;
     }
 
     .section-heading {
         font-family: 'Space Grotesk', sans-serif;
-        font-size: 1.25rem;
+        font-size: 1.28rem;
         font-weight: 700;
         color: #edf4ff;
-        margin: 26px 0 4px 0;
+        margin: 28px 0 4px;
     }
 
     .section-subtitle {
         color: #899bb4;
-        font-size: 0.85rem;
+        font-size: .85rem;
         margin-bottom: 17px;
+        line-height: 1.6;
     }
 
     .metric-card {
-        background: linear-gradient(
-            145deg, rgba(20, 32, 52, 0.97), rgba(13, 22, 38, 0.97)
-        );
+        background: linear-gradient(145deg,#142034,#0d1626);
         border: 1px solid var(--border);
         border-radius: 17px;
-        padding: 19px 19px 17px 19px;
-        min-height: 142px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.10);
+        padding: 19px;
+        min-height: 143px;
+        box-shadow: 0 8px 25px rgba(0,0,0,.1);
     }
 
     .metric-top {
@@ -252,7 +233,7 @@ st.markdown(
 
     .metric-label {
         color: #98a9c1;
-        font-size: 0.79rem;
+        font-size: .79rem;
         font-weight: 600;
     }
 
@@ -263,8 +244,8 @@ st.markdown(
         width: 35px;
         height: 35px;
         border-radius: 11px;
-        background: rgba(94, 231, 245, 0.09);
-        border: 1px solid rgba(94, 231, 245, 0.13);
+        background: rgba(94,231,245,.09);
+        border: 1px solid rgba(94,231,245,.13);
         font-size: 1rem;
     }
 
@@ -272,23 +253,23 @@ st.markdown(
         font-family: 'Space Grotesk', sans-serif;
         color: #f4f8ff;
         font-weight: 700;
-        font-size: clamp(1.4rem, 2.3vw, 2rem);
-        letter-spacing: -0.8px;
+        font-size: clamp(1.4rem,2.3vw,2rem);
+        letter-spacing: -.8px;
         overflow-wrap: anywhere;
     }
 
     .metric-caption {
         color: #8194ad;
-        font-size: 0.74rem;
+        font-size: .74rem;
         margin-top: 7px;
     }
 
-    .content-panel {
-        background: rgba(16, 25, 42, 0.86);
+    .panel {
+        background: rgba(16,25,42,.86);
         border: 1px solid var(--border);
-        border-radius: 19px;
-        padding: 21px;
-        height: 100%;
+        border-radius: 18px;
+        padding: 20px;
+        min-height: 100%;
     }
 
     .panel-title {
@@ -301,19 +282,17 @@ st.markdown(
 
     .panel-description {
         color: #899bb4;
-        font-size: 0.79rem;
+        font-size: .79rem;
         line-height: 1.6;
-        margin-bottom: 16px;
+        margin-bottom: 14px;
     }
 
     .model-card {
-        background: linear-gradient(
-            145deg, rgba(19, 32, 52, 0.98), rgba(13, 22, 38, 0.98)
-        );
+        background: linear-gradient(145deg,#132034,#0d1626);
         border: 1px solid var(--border);
         border-radius: 17px;
         padding: 21px;
-        height: 100%;
+        min-height: 220px;
     }
 
     .model-icon {
@@ -323,7 +302,7 @@ st.markdown(
         width: 42px;
         height: 42px;
         border-radius: 13px;
-        background: rgba(114, 153, 255, 0.12);
+        background: rgba(114,153,255,.12);
         font-size: 1.25rem;
         margin-bottom: 14px;
     }
@@ -333,14 +312,12 @@ st.markdown(
         font-size: 1.03rem;
         font-weight: 700;
         margin-bottom: 8px;
-        overflow-wrap: anywhere;
     }
 
     .model-description {
         color: #8fa1ba;
-        font-size: 0.82rem;
+        font-size: .82rem;
         line-height: 1.7;
-        min-height: 65px;
     }
 
     .status-chip {
@@ -348,9 +325,9 @@ st.markdown(
         border-radius: 20px;
         padding: 5px 9px;
         color: #8ff0c0;
-        background: rgba(87, 227, 162, 0.08);
-        border: 1px solid rgba(87, 227, 162, 0.18);
-        font-size: 0.70rem;
+        background: rgba(87,227,162,.08);
+        border: 1px solid rgba(87,227,162,.18);
+        font-size: .7rem;
         margin-top: 12px;
     }
 
@@ -358,9 +335,9 @@ st.markdown(
         border-left: 3px solid var(--cyan);
         border-radius: 0 12px 12px 0;
         padding: 14px 16px;
-        background: rgba(94, 231, 245, 0.055);
+        background: rgba(94,231,245,.055);
         color: #c9d7e9;
-        font-size: 0.84rem;
+        font-size: .84rem;
         line-height: 1.7;
         margin: 9px 0;
     }
@@ -370,7 +347,7 @@ st.markdown(
         margin-top: 42px;
         padding-top: 19px;
         color: #71839d;
-        font-size: 0.77rem;
+        font-size: .77rem;
         line-height: 1.8;
     }
 
@@ -391,37 +368,15 @@ st.markdown(
     }
 
     div.stButton > button[kind="primary"] {
-        background: linear-gradient(110deg, #5ee7f5, #7299ff);
+        background: linear-gradient(110deg,#5ee7f5,#7299ff);
         color: #07111e;
         border: none;
     }
 
-    div.stButton > button[kind="primary"]:hover {
-        border: none;
-        filter: brightness(1.08);
-        color: #07111e;
-    }
-
-    [data-testid="stMetric"] {
-        background: rgba(17, 29, 48, 0.5);
-        border: 1px solid var(--border);
-        border-radius: 13px;
-        padding: 14px;
-    }
-
-    @media (max-width: 768px) {
-        .hero {
-            padding: 25px 21px;
-        }
-
-        .block-container {
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-
-        .hero-title {
-            letter-spacing: -0.8px;
-        }
+    @media(max-width:768px) {
+        .hero { padding: 24px 20px; }
+        .block-container { padding-left: 1rem; padding-right: 1rem; }
+        .hero-title { letter-spacing: -.8px; }
     }
     </style>
     """,
@@ -429,79 +384,80 @@ st.markdown(
 )
 
 
-# ------------------------------------------------------------
-# 3. DATA LOADING
-# ------------------------------------------------------------
+# ============================================================
+# 3. SAFE DATA LOADING
+# ============================================================
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_dashboard_data():
-    """
-    Load the dataset in this order:
-    1. Existing project utility.
-    2. Local CSV candidates.
-    3. Hugging Face direct-download URLs.
-
-    This function deliberately does not load the ML models.
-    """
-
     errors = []
 
-    # Use the project's existing utility first.
+    # First use the project's existing data utility.
     try:
         from utils.data_utils import load_data
 
-        df = load_data()
+        result = load_data()
 
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            return df, "Project data utility"
+        if isinstance(result, pd.DataFrame) and not result.empty:
+            return result, "Project data utility"
+
+        errors.append("Project data utility returned an empty dataset.")
+
     except Exception as exc:
-        errors.append(f"Project utility: {exc}")
+        errors.append(f"Project data utility: {exc}")
 
-    # Try local dataset copies.
+    # Try local CSV files.
     for path in LOCAL_DATA_CANDIDATES:
         try:
-            if path.exists():
-                df = pd.read_csv(path)
-                if not df.empty:
-                    return df, f"Local file: {path.name}"
+            if path.is_file():
+                result = pd.read_csv(path)
+
+                if not result.empty:
+                    return result, f"Local file: {path.name}"
+
+                errors.append(f"{path.name} is empty.")
+
         except Exception as exc:
             errors.append(f"{path.name}: {exc}")
 
-    # Try Hugging Face dataset and model repository URLs.
-    for url in [HF_DATASET_URL, HF_MODEL_REPO_DATA_URL]:
-        try:
-            df = pd.read_csv(url)
+    # Fall back to Hugging Face.
+    try:
+        result = pd.read_csv(HF_DATASET_URL)
 
-            if not df.empty:
-                return df, "Hugging Face"
+        if not result.empty:
+            return result, "Hugging Face"
 
-        except Exception as exc:
-            errors.append(f"Hugging Face source: {exc}")
+        errors.append("Hugging Face CSV is empty.")
+
+    except Exception as exc:
+        errors.append(f"Hugging Face dataset: {exc}")
 
     raise RuntimeError(
-        "The EMI dataset could not be loaded from the project utility, "
-        "local files, or Hugging Face.\n\n"
-        + "\n".join(errors[-4:])
+        "The EMI dataset could not be loaded.\n\n"
+        + "\n".join(errors[-5:])
     )
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_model_metadata():
-    """
-    Metadata is lightweight. Avoid loading the large classification and
-    regression model objects on the homepage.
-    """
+    # Only load lightweight metadata on the homepage.
+    # Do not load large model objects here.
     try:
         from utils.model_utils import load_feature_info
 
         info = load_feature_info()
         if isinstance(info, dict):
             return info
+
     except Exception:
         pass
 
     return {}
 
+
+# ============================================================
+# 4. HELPER FUNCTIONS
+# ============================================================
 
 def safe_string(value, default="Not available"):
     if value is None:
@@ -513,17 +469,19 @@ def safe_string(value, default="Not available"):
     except (TypeError, ValueError):
         pass
 
-    result = str(value).strip()
+    value = str(value).strip()
 
-    if not result or result.lower() in {"nan", "none", "null"}:
+    if not value or value.lower() in {"nan", "none", "null"}:
         return default
 
-    return result
+    return value
 
 
 def find_column(df, candidates):
-    """Find a column without assuming exact capitalization."""
-    mapping = {str(c).strip().lower(): c for c in df.columns}
+    mapping = {
+        str(column).strip().lower(): column
+        for column in df.columns
+    }
 
     for candidate in candidates:
         if candidate.lower() in mapping:
@@ -539,11 +497,11 @@ def numeric_series(df, column):
     return pd.to_numeric(df[column], errors="coerce").dropna()
 
 
-def rupees(value, decimals=0):
+def rupees(value):
     if pd.isna(value):
         return "N/A"
 
-    return "₹" + f"{float(value):,.{decimals}f}"
+    return "₹" + f"{float(value):,.0f}"
 
 
 def compact_number(value):
@@ -551,6 +509,7 @@ def compact_number(value):
 
     if abs(value) >= 1_000_000:
         return f"{value / 1_000_000:.2f}M"
+
     if abs(value) >= 1_000:
         return f"{value / 1_000:.1f}K"
 
@@ -562,11 +521,11 @@ def metric_card(label, value, caption, icon):
         f"""
         <div class="metric-card">
             <div class="metric-top">
-                <span class="metric-label">{html.escape(label)}</span>
-                <span class="metric-icon">{icon}</span>
+                <span class="metric-label">{html.escape(str(label))}</span>
+                <span class="metric-icon">{html.escape(str(icon))}</span>
             </div>
             <div class="metric-value">{html.escape(str(value))}</div>
-            <div class="metric-caption">{html.escape(caption)}</div>
+            <div class="metric-caption">{html.escape(str(caption))}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -589,46 +548,65 @@ def plotly_theme(fig, height=350):
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(
-            family="DM Sans, sans-serif",
-            color="#c7d5e8",
-            size=12,
-        ),
-        margin=dict(l=12, r=12, t=30, b=12),
-        legend=dict(
-            bgcolor="rgba(0,0,0,0)",
-            borderwidth=0,
-        ),
-        hoverlabel=dict(
-            bgcolor="#10192a",
-            font_color="#edf3ff",
-            bordercolor="#334155",
-        ),
+        font={"family": "DM Sans, sans-serif", "color": "#c7d5e8"},
+        margin={"l": 12, "r": 12, "t": 30, "b": 12},
+        hoverlabel={
+            "bgcolor": "#10192a",
+            "font_color": "#edf3ff",
+            "bordercolor": "#334155",
+        },
     )
 
     fig.update_xaxes(
         showgrid=False,
         zeroline=False,
-        linecolor="rgba(148,163,184,0.15)",
+        linecolor="rgba(148,163,184,.15)",
     )
     fig.update_yaxes(
-        gridcolor="rgba(148,163,184,0.10)",
+        gridcolor="rgba(148,163,184,.10)",
         zeroline=False,
-        linecolor="rgba(148,163,184,0.15)",
+        linecolor="rgba(148,163,184,.15)",
     )
 
     return fig
 
 
-# ------------------------------------------------------------
-# 4. SIDEBAR BRANDING
-# ------------------------------------------------------------
+def build_data_types(df):
+    """
+    Avoid select_dtypes(include=['object']) so Pandas does not emit
+    the warning about future string-dtype selection behaviour.
+    """
+    numeric = []
+    categorical = []
+
+    for column in df.columns:
+        dtype = df[column].dtype
+
+        if pd.api.types.is_numeric_dtype(dtype):
+            numeric.append(column)
+
+        is_categorical = (
+            pd.api.types.is_object_dtype(dtype)
+            or pd.api.types.is_string_dtype(dtype)
+            or isinstance(dtype, pd.CategoricalDtype)
+            or pd.api.types.is_bool_dtype(dtype)
+        )
+
+        if is_categorical:
+            categorical.append(column)
+
+    return numeric, categorical
+
+
+# ============================================================
+# 5. SIDEBAR
+# ============================================================
 
 with st.sidebar:
     st.markdown(
         """
         <div class="brand">EMI<span class="brand-accent">Predict</span></div>
-        <div style="color:#8fa1ba;font-size:0.78rem;margin-top:5px;">
+        <div style="color:#8fa1ba;font-size:.78rem;margin-top:5px;">
             Intelligent Financial Risk Platform
         </div>
         <div class="sidebar-tag">AI · ML · MLFLOW</div>
@@ -637,21 +615,19 @@ with st.sidebar:
     )
 
     st.markdown("---")
-
     st.markdown("#### Workspace")
+
     st.caption(
-        "Use the application pages in Streamlit's navigation menu "
-        "to open the prediction tools, analytics, model dashboard, "
-        "and financial data management modules."
+        "Use the Streamlit page navigation to open the prediction, "
+        "analytics, MLflow, and financial data management modules."
     )
 
     st.markdown("---")
-
     st.markdown("#### Platform modules")
 
     st.markdown(
         """
-        <div style="line-height:2.15;font-size:0.85rem;color:#b5c5db;">
+        <div style="line-height:2.1;font-size:.84rem;color:#b5c5db;">
         ◈ &nbsp; Financial overview<br>
         ◈ &nbsp; EMI eligibility classification<br>
         ◈ &nbsp; Maximum EMI regression<br>
@@ -664,139 +640,104 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("#### Data source")
-    st.caption("Local project files / Hugging Face fallback")
+    st.caption("Local files with Hugging Face fallback")
 
-    if st.button("↻ Refresh dashboard data", use_container_width=True):
+    if st.button(
+        "↻ Refresh dashboard data",
+        width="stretch",
+        key="refresh_dashboard_data",
+    ):
         load_dashboard_data.clear()
         load_model_metadata.clear()
         st.rerun()
 
     st.markdown(
         """
-        <div style="margin-top:25px;color:#647892;font-size:0.72rem;
+        <div style="margin-top:25px;color:#647892;font-size:.72rem;
                     line-height:1.7;">
         EMIPredict AI<br>
-        Financial Intelligence Workspace<br>
-        <span style="color:#5ee7f5;">●</span> Dashboard interface
+        Financial Intelligence Workspace
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-# ------------------------------------------------------------
-# 5. LOAD DATA
-# ------------------------------------------------------------
+# ============================================================
+# 6. INITIALIZE APP WITH TRACEBACK REPORTING
+# ============================================================
 
 try:
     with st.spinner("Preparing your financial intelligence dashboard..."):
         df, data_source = load_dashboard_data()
         feature_info = load_model_metadata()
 
-except Exception as exc:
-    st.error("Unable to initialize the dashboard dataset.")
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        raise ValueError("The loaded dataset is empty or invalid.")
+
+    # Prevent an empty or malformed dataframe from breaking analytics.
+    df.columns = [str(c).strip() for c in df.columns]
+
+    numeric_cols, categorical_cols = build_data_types(df)
+
+except Exception:
+    st.error("Dashboard initialization failed.")
 
     st.markdown(
         """
-        **Check the following:**
-        - `utils/data_utils.py` is present in your repository.
-        - The dataset is available locally or in the Hugging Face repository.
-        - The Hugging Face repository and filename are correct.
-        - Your deployment has access to the internet.
+        Please check:
+        - `utils/data_utils.py` and `utils/model_utils.py` exist.
+        - The CSV filename and Hugging Face repository are correct.
+        - The deployed app has network access to Hugging Face.
+        - Your dependencies are compatible with the application code.
         """
     )
 
-    with st.expander("Technical details"):
-        st.code(str(exc))
+    with st.expander("Full technical traceback", expanded=True):
+        st.code(traceback.format_exc(), language="text")
 
     st.stop()
 
 
-# ------------------------------------------------------------
-# 6. COLUMN DETECTION
-# ------------------------------------------------------------
+# ============================================================
+# 7. DETECT DATASET COLUMNS
+# ============================================================
 
 row_count = len(df)
 column_count = len(df.columns)
 missing_cells = int(df.isna().sum().sum())
 
-eligibility_col = find_column(
-    df,
-    [
-        "emi_eligibility",
-        "eligibility",
-        "emi_eligible",
-        "loan_eligibility",
-        "eligible",
-        "target",
-    ],
-)
-
 scenario_col = find_column(
     df,
-    [
-        "emi_scenario",
-        "loan_type",
-        "loan_category",
-        "scenario",
-        "loan_scenario",
-    ],
+    ["emi_scenario", "loan_type", "loan_category", "scenario", "loan_scenario"],
+)
+
+eligibility_col = find_column(
+    df,
+    ["emi_eligibility", "eligibility", "emi_eligible", "loan_eligibility",
+     "eligible", "target"],
 )
 
 emi_col = find_column(
     df,
-    [
-        "max_affordable_emi",
-        "maximum_emi",
-        "max_emi",
-        "emi_amount",
-        "monthly_emi",
-        "emi",
-        "predicted_emi",
-    ],
+    ["max_affordable_emi", "maximum_emi", "max_emi", "emi_amount",
+     "monthly_emi", "emi", "predicted_emi"],
 )
 
 salary_col = find_column(
     df,
-    [
-        "monthly_salary",
-        "monthly_income",
-        "salary",
-        "income",
-        "monthly_income_inr",
-    ],
+    ["monthly_salary", "monthly_income", "salary", "income",
+     "monthly_income_inr"],
 )
 
 age_col = find_column(
     df,
-    [
-        "age",
-        "applicant_age",
-        "customer_age",
-    ],
+    ["age", "applicant_age", "customer_age"],
 )
 
 affordability_col = find_column(
     df,
-    [
-        "affordability_ratio",
-        "emi_affordability_ratio",
-    ],
-)
-
-numeric_cols = df.select_dtypes(include="number").columns.tolist()
-categorical_cols = df.select_dtypes(
-    include=["object", "category", "bool"]
-).columns.tolist()
-
-median_salary = (
-    numeric_series(df, salary_col).median()
-    if salary_col else float("nan")
-)
-
-median_emi = (
-    numeric_series(df, emi_col).median()
-    if emi_col else float("nan")
+    ["affordability_ratio", "emi_affordability_ratio"],
 )
 
 unique_scenarios = (
@@ -804,21 +745,21 @@ unique_scenarios = (
     if scenario_col else 0
 )
 
-unique_eligibility = (
-    int(df[eligibility_col].nunique(dropna=True))
-    if eligibility_col else 0
+missing_percentage = (
+    missing_cells / (row_count * column_count) * 100
+    if row_count and column_count else 0
 )
 
 
-# ------------------------------------------------------------
-# 7. HERO SECTION
-# ------------------------------------------------------------
+# ============================================================
+# 8. HERO
+# ============================================================
 
 st.markdown(
     """
     <div class="hero">
         <div class="hero-eyebrow">
-            <span>✦</span> FINANCIAL INTELLIGENCE · LIVE DASHBOARD
+            ✦ FINANCIAL INTELLIGENCE · DASHBOARD
         </div>
         <div class="hero-title">
             Smarter lending.<br>
@@ -828,7 +769,7 @@ st.markdown(
             An integrated machine-learning platform for EMI eligibility
             assessment, affordable installment estimation, financial
             dataset exploration, and model performance monitoring.
-            Turn financial data into insights through a single workspace.
+            Turn financial data into insights through one workspace.
         </div>
         <div class="hero-pills">
             <span class="hero-pill">◈ Classification</span>
@@ -841,18 +782,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-top_left, top_right = st.columns([3, 1])
+meta_left, meta_right = st.columns([3, 1])
 
-with top_left:
+with meta_left:
     st.caption(
         f"DATA SOURCE  /  {data_source}  ·  "
         f"{pd.Timestamp.now().strftime('%d %b %Y')}"
     )
 
-with top_right:
+with meta_right:
     st.markdown(
         """
-        <div style="text-align:right;color:#8fa1ba;font-size:0.77rem;">
+        <div style="text-align:right;color:#8fa1ba;font-size:.77rem;">
         <span style="color:#57e3a2;">●</span> Dashboard initialized
         </div>
         """,
@@ -860,9 +801,9 @@ with top_right:
     )
 
 
-# ------------------------------------------------------------
-# 8. KPI CARDS
-# ------------------------------------------------------------
+# ============================================================
+# 9. KPI CARDS
+# ============================================================
 
 section_heading(
     "Platform at a glance",
@@ -904,31 +845,26 @@ with k4:
     )
 
 
-# ------------------------------------------------------------
-# 9. DATA-DRIVEN INSIGHTS
-# ------------------------------------------------------------
+# ============================================================
+# 10. DISTRIBUTION CHARTS
+# ============================================================
 
 section_heading(
     "Financial overview",
-    "Explore the distribution of EMI scenarios, eligibility outcomes, "
-    "and affordability indicators.",
+    "Explore loan scenarios and eligibility outcomes in the loaded dataset.",
 )
 
-chart_left, chart_right = st.columns([1.12, 1], gap="large")
+left_chart, right_chart = st.columns([1.12, 1], gap="large")
 
-with chart_left:
-    st.markdown(
-        '<div class="content-panel">',
-        unsafe_allow_html=True,
-    )
+with left_chart:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown(
         '<div class="panel-title">Loan scenario composition</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="panel-description">'
-        'Understand which financing categories appear most frequently '
-        'in the available data.</div>',
+        '<div class="panel-description">Most frequently occurring '
+        'financing categories.</div>',
         unsafe_allow_html=True,
     )
 
@@ -953,11 +889,7 @@ with chart_left:
                 color="Records",
                 color_continuous_scale=["#24416b", "#5ee7f5"],
             )
-            fig.update_traces(
-                textposition="outside",
-                cliponaxis=False,
-                marker_line_width=0,
-            )
+            fig.update_traces(textposition="outside", cliponaxis=False)
             fig.update_layout(
                 coloraxis_showscale=False,
                 xaxis_title="Number of records",
@@ -976,26 +908,22 @@ with chart_left:
             )
     else:
         st.info(
-            "A recognized loan scenario column was not found. "
-            "The dataset preview below can help verify your column names."
+            "No recognized loan scenario column was found. "
+            "Inspect the dataset explorer to verify column names."
         )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-with chart_right:
-    st.markdown(
-        '<div class="content-panel">',
-        unsafe_allow_html=True,
-    )
+with right_chart:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown(
         '<div class="panel-title">Eligibility distribution</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="panel-description">'
-        'View the balance of eligibility labels in the dataset. '
-        'This is a dataset distribution, not a live prediction.</div>',
+        '<div class="panel-description">Distribution of target labels '
+        'in the existing dataset, not live predictions.</div>',
         unsafe_allow_html=True,
     )
 
@@ -1014,33 +942,21 @@ with chart_right:
                 eligibility_counts,
                 names="Eligibility",
                 values="Records",
-                hole=0.68,
+                hole=0.67,
                 color_discrete_sequence=[
-                    "#5ee7f5",
-                    "#7299ff",
-                    "#57e3a2",
-                    "#b69aff",
-                    "#f6bd60",
-                    "#64748b",
+                    "#5ee7f5", "#7299ff", "#57e3a2",
+                    "#b69aff", "#f6bd60", "#64748b",
                 ],
             )
-
             fig.update_traces(
                 textposition="inside",
                 textinfo="percent",
-                marker=dict(line=dict(color="#10192a", width=3)),
-                hovertemplate=(
-                    "<b>%{label}</b><br>"
-                    "Records: %{value:,}<br>"
-                    "Share: %{percent}<extra></extra>"
-                ),
+                marker={"line": {"color": "#10192a", "width": 3}},
             )
-
             fig.update_layout(
                 showlegend=True,
-                legend=dict(orientation="h", y=-0.15),
+                legend={"orientation": "h", "y": -0.15},
             )
-
             st.plotly_chart(
                 plotly_theme(fig, 350),
                 width="stretch",
@@ -1053,124 +969,111 @@ with chart_right:
             )
 
         st.caption(
-            f"{unique_eligibility} distinct eligibility label(s) detected."
+            f"{df[eligibility_col].nunique(dropna=True)} distinct "
+            "eligibility labels detected."
         )
     else:
         st.info(
-            "No recognized eligibility column was found. "
-            "Verify the dataset's target column."
+            "No recognized eligibility target column was found."
         )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ------------------------------------------------------------
-# 10. NUMERIC FINANCIAL INDICATORS
-# ------------------------------------------------------------
+# ============================================================
+# 11. FINANCIAL INDICATORS
+# ============================================================
 
 section_heading(
     "Financial indicators",
-    "Descriptive statistics from available numeric fields. "
-    "Values below summarize the dataset rather than an individual applicant.",
+    "Descriptive statistics from the detected financial columns.",
 )
 
-f1, f2, f3 = st.columns(3, gap="medium")
+median_salary = (
+    numeric_series(df, salary_col).median()
+    if salary_col else float("nan")
+)
 
-with f1:
-    salary_display = (
-        rupees(median_salary)
-        if pd.notna(median_salary) else "N/A"
-    )
+median_emi = (
+    numeric_series(df, emi_col).median()
+    if emi_col else float("nan")
+)
+
+a, b, c = st.columns(3, gap="medium")
+
+with a:
     metric_card(
         "Median monthly salary",
-        salary_display,
+        rupees(median_salary),
         "Median of the detected income column",
         "₹",
     )
 
-with f2:
-    emi_display = (
-        rupees(median_emi)
-        if pd.notna(median_emi) else "N/A"
-    )
+with b:
     metric_card(
         "Median EMI-related value",
-        emi_display,
+        rupees(median_emi),
         "Median of the detected EMI column",
         "↗",
     )
 
-with f3:
-    missing_pct = (
-        (missing_cells / (row_count * column_count)) * 100
-        if row_count and column_count else 0
-    )
+with c:
     metric_card(
         "Data completeness",
-        f"{100 - missing_pct:.1f}%",
-        "Percentage of cells that are not missing",
+        f"{100 - missing_percentage:.1f}%",
+        "Percentage of non-missing cells",
         "✓",
     )
 
 
-# ------------------------------------------------------------
-# 11. AFFORDABILITY ANALYSIS
-# ------------------------------------------------------------
+# ============================================================
+# 12. AFFORDABILITY ANALYSIS
+# ============================================================
 
 section_heading(
     "Affordability analysis",
-    "Inspect the relationship between financial variables when "
-    "the relevant columns are present.",
+    "Inspect relationships between income and EMI-related values "
+    "when the required fields are available.",
 )
 
 if salary_col and emi_col:
-    affordability_df = df[[salary_col, emi_col]].copy()
-    affordability_df[salary_col] = pd.to_numeric(
-        affordability_df[salary_col], errors="coerce"
-    )
-    affordability_df[emi_col] = pd.to_numeric(
-        affordability_df[emi_col], errors="coerce"
-    )
-    affordability_df = affordability_df.dropna()
+    chart_df = df[[salary_col, emi_col]].copy()
 
-    affordability_df = affordability_df[
-        (affordability_df[salary_col] >= 0)
-        & (affordability_df[emi_col] >= 0)
+    chart_df[salary_col] = pd.to_numeric(
+        chart_df[salary_col], errors="coerce"
+    )
+    chart_df[emi_col] = pd.to_numeric(
+        chart_df[emi_col], errors="coerce"
+    )
+
+    chart_df = chart_df.dropna()
+    chart_df = chart_df[
+        (chart_df[salary_col] >= 0)
+        & (chart_df[emi_col] >= 0)
     ]
 
-    if not affordability_df.empty:
-        if len(affordability_df) > 4000:
-            affordability_df = affordability_df.sample(
-                n=4000, random_state=42
-            )
+    if len(chart_df) > 4000:
+        chart_df = chart_df.sample(n=4000, random_state=42)
 
+    if not chart_df.empty:
         if PLOTLY_AVAILABLE:
             fig = px.scatter(
-                affordability_df,
+                chart_df,
                 x=salary_col,
                 y=emi_col,
                 opacity=0.55,
                 render_mode="webgl",
+                color_discrete_sequence=["#5ee7f5"],
                 labels={
                     salary_col: "Monthly salary",
                     emi_col: "EMI-related value",
                 },
-                color_discrete_sequence=["#5ee7f5"],
             )
-
-            fig.update_traces(
-                marker=dict(size=6),
-                hovertemplate=(
-                    "Monthly salary: %{x:,.0f}<br>"
-                    "EMI value: %{y:,.0f}<extra></extra>"
-                ),
-            )
-
+            fig.update_traces(marker={"size": 6})
             fig.update_layout(
                 xaxis_title="Monthly salary",
                 yaxis_title="EMI-related value",
             )
-
             st.plotly_chart(
                 plotly_theme(fig, 400),
                 width="stretch",
@@ -1178,37 +1081,30 @@ if salary_col and emi_col:
             )
         else:
             st.scatter_chart(
-                affordability_df,
+                chart_df,
                 x=salary_col,
                 y=emi_col,
                 width="stretch",
             )
 
         st.caption(
-            "Interpretation: this chart displays the observed relationship "
-            "between the selected columns. It does not establish causation "
-            "or guarantee an individual's affordability."
+            "This chart summarizes observed data. It does not establish "
+            "causation or guarantee an individual's affordability."
         )
-
     else:
-        st.info("No usable numeric rows were available for this chart.")
+        st.info("No usable numeric rows are available for this chart.")
 
 elif affordability_col:
-    ratio_data = numeric_series(df, affordability_col)
+    ratio = numeric_series(df, affordability_col)
 
-    if not ratio_data.empty:
+    if not ratio.empty:
         if PLOTLY_AVAILABLE:
-            ratio_df = pd.DataFrame(
-                {"Affordability ratio": ratio_data}
-            )
-
             fig = px.histogram(
-                ratio_df,
+                pd.DataFrame({"Affordability ratio": ratio}),
                 x="Affordability ratio",
                 nbins=35,
                 color_discrete_sequence=["#7299ff"],
             )
-            fig.update_traces(marker_line_width=0)
             st.plotly_chart(
                 plotly_theme(fig, 360),
                 width="stretch",
@@ -1216,30 +1112,27 @@ elif affordability_col:
             )
         else:
             st.bar_chart(
-                ratio_data.value_counts(bins=20).sort_index(),
+                ratio.value_counts(bins=20).sort_index(),
                 width="stretch",
             )
     else:
-        st.info("The affordability ratio column contains no usable values.")
-
+        st.info("No usable affordability ratio values were found.")
 else:
     st.info(
-        "Affordability visualization is unavailable because the dataset "
-        "does not contain a recognized salary, EMI, or affordability-ratio "
-        "column. The Dataset Explorer below shows the actual column names."
+        "This chart requires recognized salary and EMI columns, "
+        "or an affordability-ratio column. Review the dataset explorer "
+        "to confirm the field names."
     )
 
 
-# ------------------------------------------------------------
-# 12. MODEL INFORMATION
-# ------------------------------------------------------------
+# ============================================================
+# 13. MACHINE LEARNING MODULES
+# ============================================================
 
 section_heading(
     "Machine learning architecture",
-    "A unified interface for classification and regression workflows.",
+    "A unified interface for classification, regression, and monitoring.",
 )
-
-m1, m2, m3 = st.columns(3, gap="medium")
 
 classification_name = safe_string(
     feature_info.get("best_classification_model")
@@ -1253,24 +1146,17 @@ regression_name = safe_string(
     "Configured in model utilities",
 )
 
-class_description = (
-    "Estimates the EMI eligibility class from applicant and "
-    "financial features using the trained classification pipeline."
-)
-
-reg_description = (
-    "Estimates a maximum affordable EMI value using the trained "
-    "regression pipeline and its required input features."
-)
+m1, m2, m3 = st.columns(3, gap="medium")
 
 with m1:
     st.markdown(
-        f"""
+        """
         <div class="model-card">
             <div class="model-icon">◈</div>
             <div class="model-name">Eligibility classification</div>
             <div class="model-description">
-                {html.escape(class_description)}
+                Uses applicant and financial features to estimate the
+                eligibility class from the trained classification model.
             </div>
             <div class="status-chip">Classification pipeline</div>
         </div>
@@ -1280,12 +1166,13 @@ with m1:
 
 with m2:
     st.markdown(
-        f"""
+        """
         <div class="model-card">
             <div class="model-icon">↗</div>
             <div class="model-name">EMI regression</div>
             <div class="model-description">
-                {html.escape(reg_description)}
+                Estimates an EMI-related numerical outcome using the
+                trained regression pipeline and its expected features.
             </div>
             <div class="status-chip">Regression pipeline</div>
         </div>
@@ -1298,13 +1185,12 @@ with m3:
         """
         <div class="model-card">
             <div class="model-icon">◎</div>
-            <div class="model-name">MLflow model monitoring</div>
+            <div class="model-name">MLflow monitoring</div>
             <div class="model-description">
                 Experiment tracking, logged metrics, and model-related
-                information are handled by the dedicated monitoring page
-                configured in this repository.
+                information are handled by the separate monitoring page.
             </div>
-            <div class="status-chip">Separate tracking module</div>
+            <div class="status-chip">Tracking module</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1317,60 +1203,46 @@ with st.expander("Model configuration details"):
     st.markdown("**Regression model configured in metadata**")
     st.code(regression_name)
 
-    st.markdown(
-        "The dashboard intentionally avoids loading the full model "
-        "artifacts during homepage initialization. The prediction pages "
-        "should load models when inference is requested."
+    st.caption(
+        "The homepage intentionally does not load large model artifacts. "
+        "Prediction pages should load their models when inference is needed."
     )
 
     if isinstance(feature_info, dict) and feature_info:
-        st.markdown("**Available metadata fields**")
-        st.json(
-            {
-                str(k): (
-                    v if isinstance(v, (str, int, float, bool, list, dict))
-                    else str(v)
-                )
-                for k, v in feature_info.items()
-            }
-        )
+        st.markdown("**Available model metadata**")
+        st.json(feature_info)
     else:
         st.caption(
-            "No feature metadata was returned by load_feature_info(). "
-            "The prediction pages can still use their configured models."
+            "No metadata was returned by load_feature_info(). "
+            "Check the model utility if you expect metadata to be available."
         )
 
 
-# ------------------------------------------------------------
-# 13. DATASET EXPLORER
-# ------------------------------------------------------------
+# ============================================================
+# 14. DATASET EXPLORER
+# ============================================================
 
 section_heading(
     "Dataset explorer",
-    "Search, inspect, and profile the dataset without exposing "
-    "the model-loading process to the homepage.",
+    "Search records, inspect feature statistics, and review data quality.",
 )
 
 with st.container(border=True):
-    tab_preview, tab_profile, tab_missing = st.tabs(
-        [
-            "▦  Data preview",
-            "◉  Statistical profile",
-            "⌁  Data quality",
-        ]
+    tab_preview, tab_profile, tab_quality = st.tabs(
+        ["▦ Data preview", "◉ Statistical profile", "⌁ Data quality"]
     )
 
     with tab_preview:
-        search_col, row_col = st.columns([3, 1])
+        search_col, rows_col = st.columns([3, 1])
 
         with search_col:
             search_term = st.text_input(
                 "Search records",
                 placeholder="Search by scenario, eligibility, or any value...",
-                key="dashboard_dataset_search",
+                key="dashboard_search",
             )
 
-        with row_col:
+        with rows_col:
             preview_rows = st.selectbox(
                 "Rows to display",
                 [10, 25, 50, 100],
@@ -1383,9 +1255,13 @@ with st.container(border=True):
         if search_term.strip():
             term = search_term.strip()
 
+            # Use string conversion only for filtering, not for all analytics.
             mask = df.astype("string").apply(
-                lambda col: col.str.contains(
-                    term, case=False, na=False, regex=False
+                lambda column: column.str.contains(
+                    term,
+                    case=False,
+                    na=False,
+                    regex=False,
                 )
             ).any(axis=1)
 
@@ -1403,14 +1279,14 @@ with st.container(border=True):
             hide_index=True,
         )
 
-        csv_bytes = filtered_df.to_csv(index=False).encode("utf-8")
+        csv_data = filtered_df.to_csv(index=False).encode("utf-8")
 
         st.download_button(
-            label="⬇ Download filtered dataset as CSV",
-            data=csv_bytes,
+            "⬇ Download filtered dataset as CSV",
+            data=csv_data,
             file_name="emipredict_filtered_data.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
 
     with tab_profile:
@@ -1429,9 +1305,10 @@ with st.container(border=True):
             st.info("No numeric columns were detected.")
 
         st.markdown("#### Dataset structure")
+
         structure = pd.DataFrame(
             {
-                "Column": df.columns.astype(str),
+                "Column": [str(c) for c in df.columns],
                 "Data type": [str(t) for t in df.dtypes],
                 "Non-null values": [
                     int(df[c].notna().sum()) for c in df.columns
@@ -1448,7 +1325,7 @@ with st.container(border=True):
             hide_index=True,
         )
 
-    with tab_missing:
+    with tab_quality:
         missing_by_column = df.isna().sum().sort_values(ascending=False)
         missing_by_column = missing_by_column[missing_by_column > 0]
 
@@ -1458,7 +1335,9 @@ with st.container(border=True):
             missing_df = missing_by_column.rename(
                 "Missing values"
             ).reset_index()
+
             missing_df.columns = ["Column", "Missing values"]
+
             missing_df["Missing percentage"] = (
                 missing_df["Missing values"] / max(row_count, 1) * 100
             ).round(2)
@@ -1473,6 +1352,7 @@ with st.container(border=True):
                     color_continuous_scale=["#7299ff", "#f6bd60"],
                 )
                 fig.update_layout(coloraxis_showscale=False)
+
                 st.plotly_chart(
                     plotly_theme(fig, 380),
                     width="stretch",
@@ -1486,31 +1366,31 @@ with st.container(border=True):
             )
 
 
-# ------------------------------------------------------------
-# 14. DATASET INSIGHTS
-# ------------------------------------------------------------
+# ============================================================
+# 15. AUTOMATIC INSIGHTS
+# ============================================================
 
 section_heading(
     "Quick insights",
-    "Automatically generated observations based on available columns.",
+    "Automatically generated observations from the detected columns.",
 )
 
 insight_left, insight_right = st.columns(2, gap="large")
 
 with insight_left:
     if scenario_col:
-        scenario_counts = df[scenario_col].value_counts(dropna=True)
+        counts = df[scenario_col].value_counts(dropna=True)
 
-        if not scenario_counts.empty:
-            top_scenario = scenario_counts.index[0]
-            top_count = int(scenario_counts.iloc[0])
+        if not counts.empty:
+            top_scenario = str(counts.index[0])
+            top_count = int(counts.iloc[0])
             top_pct = top_count / max(row_count, 1) * 100
 
             st.markdown(
                 f"""
                 <div class="insight">
                     <b>Most frequent loan scenario</b><br>
-                    {html.escape(str(top_scenario))} represents
+                    {html.escape(top_scenario)} represents
                     <b>{top_pct:.1f}%</b> of the dataset
                     ({top_count:,} records).
                 </div>
@@ -1519,16 +1399,17 @@ with insight_left:
             )
 
     if salary_col:
-        salary_values = numeric_series(df, salary_col)
+        salaries = numeric_series(df, salary_col)
 
-        if not salary_values.empty:
+        if not salaries.empty:
             st.markdown(
                 f"""
                 <div class="insight">
                     <b>Income profile</b><br>
-                    The detected salary column has a median value of
-                    <b>{rupees(salary_values.median())}</b> and a
-                    mean value of <b>{rupees(salary_values.mean())}</b>.
+                    Median detected salary:
+                    <b>{rupees(salaries.median())}</b>.
+                    Mean detected salary:
+                    <b>{rupees(salaries.mean())}</b>.
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1536,19 +1417,18 @@ with insight_left:
 
 with insight_right:
     if eligibility_col:
-        label_counts = df[eligibility_col].value_counts(dropna=True)
+        counts = df[eligibility_col].value_counts(dropna=True)
 
-        if not label_counts.empty:
-            dominant_label = label_counts.index[0]
-            dominant_pct = label_counts.iloc[0] / max(row_count, 1) * 100
+        if not counts.empty:
+            dominant_label = str(counts.index[0])
+            dominant_pct = counts.iloc[0] / max(row_count, 1) * 100
 
             st.markdown(
                 f"""
                 <div class="insight">
                     <b>Most frequent eligibility label</b><br>
-                    <b>{html.escape(str(dominant_label))}</b> is the most
-                    frequent label, accounting for {dominant_pct:.1f}%
-                    of non-missing labels.
+                    <b>{html.escape(dominant_label)}</b> accounts for
+                    {dominant_pct:.1f}% of non-missing labels.
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1557,36 +1437,36 @@ with insight_right:
     st.markdown(
         f"""
         <div class="insight">
-            <b>Dataset quality</b><br>
+            <b>Data quality</b><br>
             {missing_cells:,} missing cells were detected across
             {row_count:,} rows and {column_count:,} columns.
-            Review the Data Quality tab for a per-column breakdown.
+            See the Data Quality tab for column-level details.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-# ------------------------------------------------------------
-# 15. FOOTER
-# ------------------------------------------------------------
+# ============================================================
+# 16. FOOTER
+# ============================================================
 
 st.markdown(
     """
     <div class="footer">
         <div style="font-family:'Space Grotesk',sans-serif;
-                    color:#d9e6fa;font-size:0.92rem;font-weight:700;">
+                    color:#d9e6fa;font-size:.92rem;font-weight:700;">
             EMIPredict <span style="color:#5ee7f5;">AI</span>
         </div>
         <div>
             Intelligent Financial Risk Assessment Platform
-            &nbsp;·&nbsp; Machine Learning &nbsp;·&nbsp; Streamlit
+            · Machine Learning · Streamlit
         </div>
         <div style="margin-top:7px;">
-            Dataset summaries are descriptive. Predictions depend on
-            the trained model, its input schema, and data quality.
-            Results should not be treated as guaranteed loan approvals
-            or professional financial advice.
+            Dataset summaries are descriptive. Predictions depend on the
+            trained model, its input schema, and data quality. Results
+            should not be treated as guaranteed loan approvals or
+            professional financial advice.
         </div>
     </div>
     """,
