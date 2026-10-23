@@ -16,6 +16,42 @@ st.set_page_config(
     layout="wide"
 )
 
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+    :root{--ink:#eaf1ff;--muted:#91a2bd;--panel:#111d31;--panel2:#15243b;--line:rgba(153,177,211,.16);--mint:#5eead4;--blue:#7c9cff;}
+    html,body,[class*="css"]{font-family:'DM Sans',sans-serif;}
+    .stApp{background:radial-gradient(ellipse at 12% 0%,rgba(46,82,143,.20),transparent 38%),radial-gradient(ellipse at 100% 8%,rgba(31,166,153,.10),transparent 30%),#08111f;color:var(--ink);}
+    [data-testid="stHeader"]{background:rgba(8,17,31,.72);}
+    [data-testid="stSidebar"]{background:linear-gradient(180deg,#0d192b 0%,#0a1423 100%);border-right:1px solid var(--line);}
+    [data-testid="stSidebar"]>div{padding-top:1.5rem;}
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{color:#aab8ce;}
+    .block-container{padding-top:2rem;padding-bottom:3rem;max-width:1500px;}
+    h1,h2,h3{font-family:'Manrope',sans-serif!important;letter-spacing:-.035em;} h1{color:#f4f7ff;font-weight:800!important;} h2,h3{color:#e8efff;}
+    p,label,.stCaption{color:#a9b8cf;} hr{border-color:var(--line);}
+    [data-testid="stMetric"]{background:linear-gradient(145deg,rgba(21,36,59,.96),rgba(14,27,45,.96));border:1px solid var(--line);border-radius:18px;padding:18px 20px;min-height:112px;box-shadow:0 12px 30px rgba(0,0,0,.12);}
+    [data-testid="stMetricLabel"]{color:#9eafc8!important;font-size:.82rem;} [data-testid="stMetricValue"]{color:#f2f6ff!important;font-family:'Manrope',sans-serif;}
+    [data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+    .hero{position:relative;overflow:hidden;border-radius:26px;padding:32px 34px;margin:0 0 25px;background:linear-gradient(118deg,#142943 0%,#13233a 54%,#123c42 100%);border:1px solid rgba(134,171,214,.22);box-shadow:0 24px 65px rgba(0,0,0,.20);}
+    .hero:after{content:'';position:absolute;width:320px;height:320px;border-radius:50%;right:-95px;top:-190px;background:rgba(94,234,212,.10);border:1px solid rgba(94,234,212,.12);}
+    .eyebrow{position:relative;z-index:1;text-transform:uppercase;letter-spacing:.16em;font-size:.72rem;font-weight:700;color:#73e7d4;margin-bottom:12px;}
+    .hero-title{position:relative;z-index:1;font-family:'Manrope',sans-serif;font-size:clamp(1.8rem,3vw,2.55rem);line-height:1.15;font-weight:800;color:#f5f8ff;margin-bottom:12px;}
+    .hero-copy{position:relative;z-index:1;color:#b6c6dc;max-width:780px;font-size:1rem;line-height:1.7;}
+    .section-kicker{color:#6ee7d4;text-transform:uppercase;letter-spacing:.15em;font-size:.7rem;font-weight:800;margin-bottom:5px;}
+    .section-copy{color:#93a5bf;font-size:.9rem;margin-bottom:18px;}
+    .panel{background:linear-gradient(145deg,rgba(20,35,57,.95),rgba(13,25,42,.95));border:1px solid var(--line);border-radius:20px;padding:22px 23px;}
+    .stButton>button{border-radius:11px;border:1px solid rgba(94,234,212,.35);background:#5eead4;color:#082126;font-weight:800;} .stButton>button:hover{background:#8bf3e3;border-color:#8bf3e3;color:#082126;}
+    [data-testid="stForm"]{background:rgba(17,29,49,.55);border:1px solid var(--line);border-radius:18px;padding:20px;}
+    div[data-baseweb="tab-list"]{gap:8px;} button[data-baseweb="tab"]{border-radius:10px;padding:10px 15px;}
+    input,textarea,[data-baseweb="select"]>div{border-radius:10px!important;}
+    .footnote{color:#71839d;font-size:.78rem;}
+    @media(max-width:800px){.hero{padding:24px 21px;}.block-container{padding-top:1rem;}}
+    </style>
+    """, unsafe_allow_html=True,
+)
+
+
 
 # ============================================================
 # PATH CONFIGURATION
@@ -153,17 +189,12 @@ df = load_data()
 # HEADER
 # ============================================================
 
-st.title(
-    "🗄️ Financial Data Management"
-)
-
 st.markdown(
     """
-    Administrative interface for managing customer
-    financial records using CRUD operations.
-
-    **C**reate → **R**ead → **U**pdate → **D**elete
-    """
+    <div class="hero"><div class="eyebrow">Administration · Record operations</div>
+    <div class="hero-title">Financial data management</div>
+    <div class="hero-copy">Create, search, update, export, and remove customer financial records from the application's CSV-backed administrative store.</div></div>
+    """, unsafe_allow_html=True,
 )
 
 
@@ -663,28 +694,23 @@ with tab_read:
         )
 
 
-        filtered_df = df.copy()
+        filtered_df = df
 
-
-        if search_text:
-
-            mask = (
-                filtered_df
-                .astype(str)
-                .apply(
-                    lambda row:
-                    row.str.contains(
-                        search_text,
-                        case=False,
-                        na=False
-                    ).any(),
-                    axis=1
-                )
-            )
-
-            filtered_df = (
-                filtered_df[mask]
-            )
+        if search_text.strip():
+            searchable_columns = [
+                c for c in [
+                    "customer_id", "gender", "marital_status", "education",
+                    "employment_type", "company_type", "house_type",
+                    "existing_loans", "emi_scenario"
+                ] if c in filtered_df.columns
+            ]
+            text_mask = filtered_df[searchable_columns].astype("string").apply(
+                lambda col: col.str.contains(search_text.strip(), case=False, na=False, regex=False)
+            ).any(axis=1) if searchable_columns else pd.Series(False, index=filtered_df.index)
+            numeric_mask = pd.Series(False, index=filtered_df.index)
+            if "customer_id" in filtered_df.columns and search_text.strip().isdigit():
+                numeric_mask = pd.to_numeric(filtered_df["customer_id"], errors="coerce").eq(int(search_text.strip()))
+            filtered_df = filtered_df.loc[text_mask | numeric_mask]
 
 
         st.dataframe(
