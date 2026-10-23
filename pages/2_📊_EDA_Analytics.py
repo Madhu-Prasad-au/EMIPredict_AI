@@ -41,7 +41,9 @@ st.markdown(
     """, unsafe_allow_html=True,
 )
 
-@st.cache_data(show_spinner="Loading financial dataset…")
+# Cache the dataframe as a shared resource instead of serializing/copying it on
+# every rerun. Do not mutate `df` anywhere below.
+@st.cache_resource(show_spinner="Loading financial dataset…")
 def get_data():
     return load_data()
 
@@ -55,92 +57,157 @@ except Exception as exc:
     st.info("Confirm that `utils/data_utils.py` can access the CSV locally or download it from Hugging Face.")
     st.stop()
 
-def fmt_currency(value):
-    return f"₹{value:,.0f}" if pd.notna(value) else "—"
-
 required = ["emi_scenario", "emi_eligibility", "monthly_salary", "credit_score", "max_monthly_emi"]
 missing = [c for c in required if c not in df.columns]
 if missing:
     st.error("The dataset is missing columns required for the analytics page: " + ", ".join(missing))
     st.stop()
 
+def fmt_currency(value):
+    return f"₹{value:,.0f}" if pd.notna(value) else "—"
+
 st.markdown(
     """<div class="hero"><div class="eyebrow">Analytics workspace · Portfolio insights</div>
     <div class="hero-title">Explore the financial dataset</div>
-    <div class="hero-copy">Filter EMI scenarios and eligibility groups, inspect customer-level patterns, and compare income, credit profile, and estimated EMI capacity.</div></div>""", unsafe_allow_html=True)
+    <div class="hero-copy">Filter EMI scenarios and eligibility groups, inspect customer-level patterns, and compare income, credit profile, and estimated EMI capacity.</div></div>""",
+    unsafe_allow_html=True,
+)
 
+# Build filters from the two low-cardinality columns only.
 with st.sidebar:
     st.markdown("### 🎛️ Analytics filters")
     scenarios = sorted(df["emi_scenario"].dropna().astype(str).unique().tolist())
     eligibilities = sorted(df["emi_eligibility"].dropna().astype(str).unique().tolist())
     scenario_filter = st.multiselect("EMI scenario", scenarios, default=scenarios)
     eligibility_filter = st.multiselect("Eligibility", eligibilities, default=eligibilities)
-    max_rows = st.select_slider("Chart sample size", options=[1000, 2500, 5000, 10000, 20000], value=10000)
-    st.caption("Large charts use a reproducible sample to keep the dashboard responsive.")
+    chart_sample_size = st.select_slider(
+        "Chart sample size", options=[500, 1000, 2000, 3000], value=2000
+    )
+    st.caption("Charts use a reproducible sample to reduce memory use on hosted deployments.")
 
-filtered_df = df.loc[df["emi_scenario"].astype(str).isin(scenario_filter) & df["emi_eligibility"].astype(str).isin(eligibility_filter)]
-if filtered_df.empty:
+# A single boolean mask is substantially lighter than repeatedly converting the
+# whole dataset to strings or making several intermediate dataframe copies.
+mask = (
+    df["emi_scenario"].isin(scenario_filter)
+    & df["emi_eligibility"].isin(eligibility_filter)
+)
+filtered_count = int(mask.sum())
+if filtered_count == 0:
     st.warning("No records match the selected filters. Choose at least one scenario and eligibility class.")
     st.stop()
 
-num = len(filtered_df)
-sample = filtered_df.sample(n=min(max_rows, num), random_state=42) if num else filtered_df
-mean_salary = pd.to_numeric(filtered_df["monthly_salary"], errors="coerce").mean()
-mean_credit = pd.to_numeric(filtered_df["credit_score"], errors="coerce").mean()
-mean_emi = pd.to_numeric(filtered_df["max_monthly_emi"], errors="coerce").mean()
-
 st.markdown('<div class="section-kicker">Snapshot</div><h2>Key portfolio indicators</h2>', unsafe_allow_html=True)
-a,b,c,d = st.columns(4)
-a.metric("Filtered records", f"{num:,}", f"{num / max(len(df),1):.1%} of dataset")
-b.metric("Average monthly salary", fmt_currency(mean_salary))
-c.metric("Average credit score", f"{mean_credit:,.0f}" if pd.notna(mean_credit) else "—")
-d.metric("Average maximum EMI", fmt_currency(mean_emi))
+salary_mean = pd.to_numeric(df.loc[mask, "monthly_salary"], errors="coerce").mean()
+credit_mean = pd.to_numeric(df.loc[mask, "credit_score"], errors="coerce").mean()
+emi_mean = pd.to_numeric(df.loc[mask, "max_monthly_emi"], errors="coerce").mean()
+
+a, b, c, d = st.columns(4)
+a.metric("Filtered records", f"{filtered_count:,}", f"{filtered_count / max(len(df), 1):.1%} of dataset")
+b.metric("Average monthly salary", fmt_currency(salary_mean))
+c.metric("Average credit score", f"{credit_mean:,.0f}" if pd.notna(credit_mean) else "—")
+d.metric("Average maximum EMI", fmt_currency(emi_mean))
+
+# Extract only the columns needed for charts, then sample immediately.
+chart_cols = ["emi_scenario", "emi_eligibility", "monthly_salary", "credit_score", "max_monthly_emi"]
+chart_data = df.loc[mask, chart_cols]
+if len(chart_data) > chart_sample_size:
+    chart_data = chart_data.sample(n=chart_sample_size, random_state=42)
+chart_data = chart_data.copy()
+for col in ["monthly_salary", "credit_score", "max_monthly_emi"]:
+    chart_data[col] = pd.to_numeric(chart_data[col], errors="coerce")
 
 st.divider()
-left,right = st.columns(2, gap="large")
+left, right = st.columns(2, gap="large")
 with left:
     st.markdown("### Eligibility distribution")
-    eligibility_counts = filtered_df["emi_eligibility"].value_counts().rename_axis("Eligibility").reset_index(name="Records")
-    st.bar_chart(eligibility_counts.set_index("Eligibility"), height=300)
+    eligibility_counts = df.loc[mask, "emi_eligibility"].value_counts(dropna=False).rename_axis("Eligibility").reset_index(name="Records")
+    st.bar_chart(eligibility_counts.set_index("Eligibility"), height=280)
     st.dataframe(eligibility_counts, use_container_width=True, hide_index=True)
 with right:
     st.markdown("### EMI scenario mix")
-    scenario_counts = filtered_df["emi_scenario"].value_counts().rename_axis("Scenario").reset_index(name="Records")
-    st.bar_chart(scenario_counts.set_index("Scenario"), height=300)
+    scenario_counts = df.loc[mask, "emi_scenario"].value_counts(dropna=False).rename_axis("Scenario").reset_index(name="Records")
+    st.bar_chart(scenario_counts.set_index("Scenario"), height=280)
     st.dataframe(scenario_counts, use_container_width=True, hide_index=True)
 
 st.divider()
-left,right = st.columns(2, gap="large")
+left, right = st.columns(2, gap="large")
 with left:
     st.markdown("### Credit score profile")
-    fig, ax = plt.subplots(figsize=(8, 4))
-    sns.histplot(data=sample, x="credit_score", hue="emi_eligibility", bins=28, element="step", stat="count", common_norm=False, ax=ax)
-    ax.set_xlabel("Credit score"); ax.set_ylabel("Customer records"); ax.set_title("Credit score by eligibility")
-    fig.patch.set_alpha(0); ax.set_facecolor("#111d31"); ax.tick_params(colors="#a9b8cf"); ax.xaxis.label.set_color("#a9b8cf"); ax.yaxis.label.set_color("#a9b8cf"); ax.title.set_color("#eaf1ff")
-    st.pyplot(fig, use_container_width=True); plt.close(fig)
+    credit_plot = chart_data.dropna(subset=["credit_score", "emi_eligibility"])
+    fig, ax = plt.subplots(figsize=(7, 3.5))
+    for label, group in credit_plot.groupby("emi_eligibility", observed=True):
+        ax.hist(group["credit_score"], bins=24, alpha=0.55, label=str(label))
+    ax.set_xlabel("Credit score")
+    ax.set_ylabel("Sampled records")
+    ax.set_title("Credit score by eligibility")
+    ax.set_facecolor("#111d31")
+    fig.patch.set_alpha(0)
+    ax.tick_params(colors="#a9b8cf")
+    ax.xaxis.label.set_color("#a9b8cf")
+    ax.yaxis.label.set_color("#a9b8cf")
+    ax.title.set_color("#eaf1ff")
+    ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 with right:
     st.markdown("### Income vs maximum affordable EMI")
-    scatter_cols = ["monthly_salary", "max_monthly_emi", "emi_eligibility"]
-    scatter = sample[scatter_cols].copy()
-    scatter["monthly_salary"] = pd.to_numeric(scatter["monthly_salary"], errors="coerce")
-    scatter["max_monthly_emi"] = pd.to_numeric(scatter["max_monthly_emi"], errors="coerce")
-    scatter = scatter.dropna()
-    fig, ax = plt.subplots(figsize=(8, 4))
-    sns.scatterplot(data=scatter, x="monthly_salary", y="max_monthly_emi", hue="emi_eligibility", alpha=.55, s=24, linewidth=0, ax=ax)
-    ax.set_xlabel("Monthly salary (₹)"); ax.set_ylabel("Maximum monthly EMI (₹)"); ax.set_title("Salary and estimated EMI capacity")
-    fig.patch.set_alpha(0); ax.set_facecolor("#111d31"); ax.tick_params(colors="#a9b8cf"); ax.xaxis.label.set_color("#a9b8cf"); ax.yaxis.label.set_color("#a9b8cf"); ax.title.set_color("#eaf1ff")
-    st.pyplot(fig, use_container_width=True); plt.close(fig)
+    scatter = chart_data.dropna(subset=["monthly_salary", "max_monthly_emi", "emi_eligibility"])
+    fig, ax = plt.subplots(figsize=(7, 3.5))
+    for label, group in scatter.groupby("emi_eligibility", observed=True):
+        ax.scatter(group["monthly_salary"], group["max_monthly_emi"], alpha=0.55, s=12, label=str(label))
+    ax.set_xlabel("Monthly salary (₹)")
+    ax.set_ylabel("Maximum monthly EMI (₹)")
+    ax.set_title("Salary and estimated EMI capacity")
+    ax.set_facecolor("#111d31")
+    fig.patch.set_alpha(0)
+    ax.tick_params(colors="#a9b8cf")
+    ax.xaxis.label.set_color("#a9b8cf")
+    ax.yaxis.label.set_color("#a9b8cf")
+    ax.title.set_color("#eaf1ff")
+    ax.legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
 st.divider()
 st.markdown('<div class="section-kicker">Data explorer</div><h2>Filtered customer records</h2>', unsafe_allow_html=True)
-search = st.text_input("Search within visible columns", placeholder="Try a scenario, eligibility, or customer attribute…", key="eda_record_search")
-view = filtered_df
+st.caption("To keep the app stable, search and preview operate on a limited record sample. Use the download option for a larger export.")
+preview_limit = 5000
+# Find matching row indices without making a string copy of every column in the full dataset.
+matching_indices = df.index[mask]
+if len(matching_indices) > preview_limit:
+    preview_indices = matching_indices[:preview_limit]
+else:
+    preview_indices = matching_indices
+preview = df.loc[preview_indices].copy()
+
+search = st.text_input(
+    "Search within preview",
+    placeholder="Try a scenario, eligibility, employment type, or other text…",
+    key="eda_record_search",
+)
 if search.strip():
-    text_cols = view.select_dtypes(include=["object", "string", "category"]).columns.tolist()
+    text_cols = preview.select_dtypes(include=["object", "string", "category"]).columns.tolist()
     if text_cols:
-        mask = view[text_cols].astype("string").apply(lambda col: col.str.contains(search.strip(), case=False, na=False, regex=False)).any(axis=1)
-        view = view.loc[mask]
-st.caption(f"Showing up to 1,000 of {len(view):,} matching records.")
-st.dataframe(view.head(1000), use_container_width=True, height=430, hide_index=True)
-st.download_button("⬇️ Download filtered CSV", data=view.to_csv(index=False).encode("utf-8"), file_name="emipredict_filtered_analytics.csv", mime="text/csv")
+        search_mask = preview[text_cols].apply(
+            lambda col: col.astype("string").str.contains(search.strip(), case=False, na=False, regex=False)
+        ).any(axis=1)
+        preview = preview.loc[search_mask]
+
+st.caption(f"Showing {len(preview):,} matching rows from a preview of up to {preview_limit:,} filtered records.")
+st.dataframe(preview.head(1000), use_container_width=True, height=400, hide_index=True)
+
+# Avoid building a potentially very large in-memory CSV on a page rerun.
+export_limit = 50000
+if filtered_count > export_limit:
+    st.warning(f"The filtered dataset contains {filtered_count:,} rows. For stability, this page exports the first {export_limit:,} matching rows.")
+export_indices = df.index[mask][:export_limit]
+export_df = df.loc[export_indices]
+st.download_button(
+    "⬇️ Download filtered CSV (up to 50,000 rows)",
+    data=export_df.to_csv(index=False).encode("utf-8"),
+    file_name="emipredict_filtered_analytics.csv",
+    mime="text/csv",
+)
 st.markdown('<p class="footnote">Analytics are descriptive and should not be treated as a standalone lending decision.</p>', unsafe_allow_html=True)
