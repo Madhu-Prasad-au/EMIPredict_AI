@@ -13,8 +13,6 @@ RUN pip install --upgrade pip && \
 
 COPY . .
 
-RUN chmod +x /app/entrypoint.sh
-
 EXPOSE 8501
 
-CMD ["./entrypoint.sh"]
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
